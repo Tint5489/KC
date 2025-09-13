@@ -29,19 +29,20 @@
         const tbody = table.querySelector("tbody");
 
         // Build header
-		thead.innerHTML = "<tr>" + headers.map(h => 
-		`<th class="px-2 py-1 border font-bold text-left">${h}</th>`
-		).join("") + "</tr>";
+thead.innerHTML = "<tr>" + headers.map(h => 
+  `<th class="px-2 py-1 border font-bold text-left text-lg">${h}</th>`
+).join("") + "</tr>";
 
-		// Build rows
-		tbody.innerHTML = "";
-		lines.forEach(line => {
-		const cols = line.split(",");
-		const row = "<tr>" + cols.map((c, i) => 
-		`<td class="px-2 py-1 border ${i === 0 ? 'font-bold text-left' : 'text-left'}">${c}</td>`
-		).join("") + "</tr>";
-		tbody.innerHTML += row;
-		});
+// Build rows
+tbody.innerHTML = "";
+lines.forEach(line => {
+  const cols = line.split(",");
+  const row = "<tr>" + cols.map((c, i) => 
+    `<td class="px-2 py-1 border ${i === 0 ? 'font-bold text-base text-left' : 'text-sm text-left'}">${c}</td>`
+  ).join("") + "</tr>";
+  tbody.innerHTML += row;
+});
+
 
 
       } catch (err) {
