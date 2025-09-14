@@ -8,7 +8,7 @@
   <style>
     body {
       font-family: Arial, Helvetica, sans-serif;
-      background: #f8f9fa; /* clean background */
+      background: #f8f9fa;
       margin: 0;
       height: 100vh;
       display: flex;
@@ -87,6 +87,7 @@
     <div class="btn-container">
       <button id="startBtn">▶ Start</button>
       <button id="stopBtn">⏹ Stop</button>
+      <button id="clearBtn">🧹 Clear Path</button>
     </div>
 
     <p id="demo" role="status" aria-live="polite">Fetching location...</p>
@@ -103,16 +104,18 @@
     const x = document.getElementById("demo");
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
+    const clearBtn = document.getElementById("clearBtn");
     const downloadCSV = document.getElementById("downloadCSV");
     const downloadGPX = document.getElementById("downloadGPX");
 
     let watchId = null;
     let map, marker, path;
-    let coords = []; // store tracked path
+    let coords = [];
+    let wakeLock = null;
 
-    // Initialize Leaflet map
+    // Initialize map
     function initMap() {
-      map = L.map("map").setView([51.505, -0.09], 13); // default London
+      map = L.map("map").setView([51.505, -0.09], 13);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: '© OpenStreetMap contributors'
@@ -125,8 +128,29 @@
 
     startBtn.addEventListener("click", startTracking);
     stopBtn.addEventListener("click", stopTracking);
+    clearBtn.addEventListener("click", clearPath);
     downloadCSV.addEventListener("click", saveCSV);
     downloadGPX.addEventListener("click", saveGPX);
+
+    // Wake Lock API
+    async function enableWakeLock() {
+      try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => {
+          console.log("Wake Lock released");
+        });
+        console.log("Wake Lock active");
+      } catch (err) {
+        console.error("Wake Lock failed:", err);
+      }
+    }
+
+    function disableWakeLock() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
 
     function startTracking() {
       if (!navigator.geolocation) {
@@ -145,6 +169,7 @@
       watchId = navigator.geolocation.watchPosition(success, error, options);
       startBtn.disabled = true;
       x.textContent = "Starting location tracking...";
+      enableWakeLock(); // prevent screen from sleeping
     }
 
     function success(position) {
@@ -158,24 +183,17 @@
                      <br><small>Updated: ${time.toLocaleTimeString()}</small>`;
 
       const newLatLng = [parseFloat(lat), parseFloat(lon)];
-
-      // Save coordinate with timestamp
       coords.push({ lat, lon, acc, time: time.toISOString() });
 
-      // Update marker
       if (!marker) {
         marker = L.marker(newLatLng).addTo(map);
       } else {
         marker.setLatLng(newLatLng);
       }
 
-      // Add to path polyline
       path.addLatLng(newLatLng);
-
-      // Center map
       map.setView(newLatLng, 16);
 
-      // Enable download buttons
       if (coords.length > 1) {
         downloadCSV.disabled = false;
         downloadGPX.disabled = false;
@@ -197,10 +215,22 @@
         watchId = null;
         startBtn.disabled = false;
         x.innerHTML += "<br><span style='color:red'><b>Tracking stopped.</b></span>";
+        disableWakeLock(); // allow screen to sleep again
       }
     }
 
-    // Download as CSV
+    function clearPath() {
+      coords = [];
+      path.setLatLngs([]);
+      if (marker) {
+        map.removeLayer(marker);
+        marker = null;
+      }
+      x.textContent = "Path cleared.";
+      downloadCSV.disabled = true;
+      downloadGPX.disabled = true;
+    }
+
     function saveCSV() {
       let csv = "Latitude,Longitude,Accuracy,Timestamp\n";
       coords.forEach(c => {
@@ -209,7 +239,6 @@
       downloadFile("track.csv", csv, "text/csv");
     }
 
-    // Download as GPX
     function saveGPX() {
       let gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="GeoTracker" xmlns="http://www.topografix.com/GPX/1/1">
@@ -228,7 +257,6 @@
       downloadFile("track.gpx", gpx, "application/gpx+xml");
     }
 
-    // Helper for downloading
     function downloadFile(filename, content, type) {
       const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
