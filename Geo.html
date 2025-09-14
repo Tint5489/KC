@@ -2,123 +2,153 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- mobile scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mobile Geolocation</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      text-align: center;
+      font-family: Arial, Helvetica, sans-serif;
+      background: url("gb.svg") center/cover no-repeat, #f0f0f0;
       margin: 0;
-      padding: 20px;
-      /* Background image setup */
-      background-image: url("background2.png"); /* change to your image name or URL */
-      background-size: contain;       /* stretch/scale to cover screen */
-      background-position: center;  /* center the image */
-      background-repeat: no-repeat; /* no tiling */
-      height: 100vh;                /* fill viewport height */
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
+
+    .card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 20px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+      padding: 30px 20px;
+      text-align: center;
+      width: min(90%, 400px);
+      backdrop-filter: blur(6px);
+    }
+
     h1 {
-      font-size: 1.6em;
+      margin-bottom: 10px;
+      font-size: 1.8em;
     }
-    button {
-      display: inline-block;
-      padding: 15px 25px;
-      font-size: 18px;
-      border: none;
-      border-radius: 10px;
-      background-color: #007bff;
-      color: white;
-      cursor: pointer;
-      margin: 10px;
-      width: 45%; /* buttons scale nicely side by side */
+
+    p {
+      margin: 10px 0;
     }
-    button:hover {
-      background-color: #0056b3;
-    }
+
     #demo {
-      margin-top: 25px;
-      font-size: 26px;   /* larger for readability */
+      margin-top: 20px;
+      font-size: 20px;
       font-weight: bold;
       color: #222;
-      word-wrap: break-word; /* prevent overflow */
+      word-wrap: break-word;
+      min-height: 60px;
+    }
+
+    .btn-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 12px;
+      color: white;
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.3s;
+    }
+
+    button:hover {
+      background: linear-gradient(135deg, #0056b3, #003f7f);
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+      transform: none;
     }
   </style>
 </head>
 <body>
 
-  <h1>📍 Mobile Geolocation</h1>
-  <p>Your coordinates will appear below:</p>
+  <div class="card">
+    <h1>📍 Mobile Geolocation</h1>
+    <p>Your coordinates will appear below:</p>
 
-  <button onclick="startTracking()">▶ Start</button>
-  <button onclick="stopTracking()">⏹ Stop</button>
+    <div class="btn-container">
+      <button id="startBtn">▶ Start</button>
+      <button id="stopBtn">⏹ Stop</button>
+    </div>
 
-  <p id="demo">Fetching location...</p>
+    <p id="demo" role="status" aria-live="polite">Fetching location...</p>
+  </div>
 
   <script>
     const x = document.getElementById("demo");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
     let watchId = null;
 
-    // Automatically start tracking when the page loads
-    window.onload = function() {
-      startTracking();
-    };
+    window.onload = () => startTracking();
+
+    startBtn.addEventListener("click", startTracking);
+    stopBtn.addEventListener("click", stopTracking);
 
     function startTracking() {
-      if (navigator.geolocation) {
-        if (watchId === null) {
-          const options = {
-            enableHighAccuracy: true,   // more accurate GPS (uses more battery)
-            timeout: 10000,            // max wait 10s for position
-            maximumAge: 5000           // reuse last fix if <5s old
-          };
-          watchId = navigator.geolocation.watchPosition(success, error, options);
-          x.innerHTML = "Starting location tracking...";
-        } else {
-          x.innerHTML += "<br><span style='color:green'><b>Already tracking.</b></span>";
-        }
-      } else { 
-        x.innerHTML = "Geolocation is not supported by this browser.";
+      if (!navigator.geolocation) {
+        x.textContent = "❌ Geolocation is not supported by this browser.";
+        return;
       }
+      if (watchId !== null) {
+        x.innerHTML = "<span style='color:green'><b>Already tracking.</b></span>";
+        return;
+      }
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000
+      };
+      watchId = navigator.geolocation.watchPosition(success, error, options);
+      startBtn.disabled = true;
+      x.textContent = "Starting location tracking...";
     }
-      
+
     function success(position) {
       const lat = position.coords.latitude.toFixed(6);
       const lon = position.coords.longitude.toFixed(6);
       const acc = position.coords.accuracy.toFixed(1);
+      const time = new Date(position.timestamp).toLocaleTimeString();
 
-      x.innerHTML = "Latitude: " + lat + 
-                    "<br>Longitude: " + lon +
-                    "<br><small>Accuracy: ±" + acc + " meters</small>";
+      x.innerHTML = `Latitude: ${lat}<br>Longitude: ${lon}
+                     <br><small>Accuracy: ±${acc}m</small>
+                     <br><small>Updated: ${time}</small>`;
     }
 
-    function error(error) {
-      switch(error.code) {
-        case error.PERMISSION_DENIED:
-          x.innerHTML = "❌ User denied the request for Geolocation.";
-          break;
-        case error.POSITION_UNAVAILABLE:
-          x.innerHTML = "⚠️ Location information is unavailable.";
-          break;
-        case error.TIMEOUT:
-          x.innerHTML = "⏳ The request to get user location timed out.";
-          break;
-        case error.UNKNOWN_ERROR:
-          x.innerHTML = "❓ An unknown error occurred.";
-          break;
-      }
+    function error(err) {
+      const messages = {
+        1: "❌ User denied the request for Geolocation.",
+        2: "⚠️ Location information is unavailable.",
+        3: "⏳ The request to get user location timed out.",
+      };
+      x.textContent = messages[err.code] || "❓ An unknown error occurred.";
     }
 
     function stopTracking() {
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
-        x.innerHTML += "<br><span style='color:red'><b>Tracking stopped.</b></span>";
         watchId = null;
+        startBtn.disabled = false;
+        x.innerHTML += "<br><span style='color:red'><b>Tracking stopped.</b></span>";
       }
     }
   </script>
 
 </body>
 </html>
-
-
-
