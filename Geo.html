@@ -42,16 +42,14 @@
   <h1>📍 Mobile Geolocation</h1>
   <p>Your coordinates will be recorded to GPX:</p>
   <div class="btn-container">
-    <button id="startBtn">▶ Start</button>
-    <button id="stopBtn" disabled>⏹ Stop</button>
+    <button id="stopBtn">⏹ Stop</button>
     <button id="downloadBtn" disabled>⬇ Download GPX</button>
   </div>
-  <p id="demo" role="status" aria-live="polite">Waiting to start...</p>
+  <p id="demo" role="status" aria-live="polite">Initializing GPS…</p>
 </div>
 
 <script>
 const x = document.getElementById("demo");
-const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
@@ -59,29 +57,23 @@ let watchId = null;
 let gpxPoints = [];
 let wakeLock = null;
 
-// Request Wake Lock to keep screen on
+// Wake lock to keep screen awake
 async function enableWakeLock() {
   try {
     wakeLock = await navigator.wakeLock?.request("screen");
-    if (wakeLock) {
-      wakeLock.addEventListener('release', () => console.log('Screen unlocked'));
-    }
+    if (wakeLock) wakeLock.addEventListener('release', () => console.log('Screen unlocked'));
   } catch (err) {
     console.warn("Wake Lock not supported:", err);
   }
 }
-
 function disableWakeLock() {
-  if (wakeLock) {
-    wakeLock.release();
-    wakeLock = null;
-  }
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
 }
 
-// Start tracking
-startBtn.addEventListener("click", async () => {
+// Start tracking automatically on load
+function startTracking() {
   if (!navigator.geolocation) {
-    x.textContent = "❌ Geolocation is not supported by this browser.";
+    x.textContent = "❌ Geolocation not supported.";
     return;
   }
   if (watchId !== null) return;
@@ -92,32 +84,27 @@ startBtn.addEventListener("click", async () => {
     timeout: 10000
   });
 
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-  x.textContent = "Recording GPS points…";
   gpxPoints = [];
   downloadBtn.disabled = true;
+  x.textContent = "Recording GPS points…";
 
-  await enableWakeLock();
-});
+  enableWakeLock();
+}
 
 // Stop tracking
 stopBtn.addEventListener("click", () => {
   if (watchId !== null) {
     navigator.geolocation.clearWatch(watchId);
     watchId = null;
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    downloadBtn.disabled = gpxPoints.length === 0;
-    x.textContent = `Recording stopped. ${gpxPoints.length} points collected.`;
     disableWakeLock();
+    downloadBtn.disabled = gpxPoints.length === 0;
+    x.textContent = `Tracking stopped. ${gpxPoints.length} points recorded.`;
   }
 });
 
 // Download GPX
 downloadBtn.addEventListener("click", () => {
   if (gpxPoints.length === 0) return;
-
   const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="MobileGeolocation" xmlns="http://www.topografix.com/GPX/1/1">
 <trk><name>GPS Track</name><trkseg>`;
@@ -146,22 +133,22 @@ function success(pos) {
   const acc = pos.coords.accuracy.toFixed(1);
   const time = pos.timestamp;
 
-  gpxPoints.push({lat: lat, lon: lon, time: time});
-
+  gpxPoints.push({lat, lon, time});
   x.innerHTML = `Last point: ${lat}, ${lon}<br>Accuracy: ±${acc}m<br>Points recorded: ${gpxPoints.length}`;
 }
 
 // Error callback
 function error(err) {
   const messages = {
-    1: "❌ User denied the request for Geolocation.",
-    2: "⚠️ Location information is unavailable.",
-    3: "⏳ The request to get user location timed out."
+    1: "❌ User denied Geolocation.",
+    2: "⚠️ Location unavailable.",
+    3: "⏳ Geolocation timed out."
   };
-  x.textContent = messages[err.code] || "❓ An unknown error occurred.";
+  x.textContent = messages[err.code] || "❓ Unknown error.";
 }
 
-// Release wake lock if page is closed
+// Auto-start tracking when page loads
+window.addEventListener("load", startTracking);
 window.addEventListener("beforeunload", disableWakeLock);
 </script>
 
