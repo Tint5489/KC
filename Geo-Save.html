@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Geolocation with Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f8f9fa; /* clean background */
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+      padding: 20px;
+      text-align: center;
+      width: min(95%, 520px);
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.6em;
+    }
+
+    #demo {
+      font-size: 18px;
+      font-weight: bold;
+      color: #222;
+      min-height: 60px;
+    }
+
+    .btn-container {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 12px;
+      color: white;
+      background: linear-gradient(135deg, #007bff, #0056b3);
+      cursor: pointer;
+      transition: transform 0.2s ease, background 0.3s;
+    }
+
+    button:hover {
+      background: linear-gradient(135deg, #0056b3, #003f7f);
+      transform: translateY(-2px);
+    }
+
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #map {
+      height: 320px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>📍 Mobile Geolocation</h1>
+    <p>Your coordinates will appear below:</p>
+
+    <div class="btn-container">
+      <button id="startBtn">▶ Start</button>
+      <button id="stopBtn">⏹ Stop</button>
+    </div>
+
+    <p id="demo" role="status" aria-live="polite">Fetching location...</p>
+    <div id="map"></div>
+
+    <div class="btn-container">
+      <button id="downloadCSV" disabled>⬇️ Download CSV</button>
+      <button id="downloadGPX" disabled>⬇️ Download GPX</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const x = document.getElementById("demo");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const downloadCSV = document.getElementById("downloadCSV");
+    const downloadGPX = document.getElementById("downloadGPX");
+
+    let watchId = null;
+    let map, marker, path;
+    let coords = []; // store tracked path
+
+    // Initialize Leaflet map
+    function initMap() {
+      map = L.map("map").setView([51.505, -0.09], 13); // default London
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+      path = L.polyline([], { color: "red", weight: 4 }).addTo(map);
+    }
+    initMap();
+
+    window.onload = () => startTracking();
+
+    startBtn.addEventListener("click", startTracking);
+    stopBtn.addEventListener("click", stopTracking);
+    downloadCSV.addEventListener("click", saveCSV);
+    downloadGPX.addEventListener("click", saveGPX);
+
+    function startTracking() {
+      if (!navigator.geolocation) {
+        x.textContent = "❌ Geolocation is not supported by this browser.";
+        return;
+      }
+      if (watchId !== null) {
+        x.innerHTML = "<span style='color:green'><b>Already tracking.</b></span>";
+        return;
+      }
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000
+      };
+      watchId = navigator.geolocation.watchPosition(success, error, options);
+      startBtn.disabled = true;
+      x.textContent = "Starting location tracking...";
+    }
+
+    function success(position) {
+      const lat = position.coords.latitude.toFixed(6);
+      const lon = position.coords.longitude.toFixed(6);
+      const acc = position.coords.accuracy.toFixed(1);
+      const time = new Date(position.timestamp);
+
+      x.innerHTML = `Latitude: ${lat}<br>Longitude: ${lon}
+                     <br><small>Accuracy: ±${acc}m</small>
+                     <br><small>Updated: ${time.toLocaleTimeString()}</small>`;
+
+      const newLatLng = [parseFloat(lat), parseFloat(lon)];
+
+      // Save coordinate with timestamp
+      coords.push({ lat, lon, acc, time: time.toISOString() });
+
+      // Update marker
+      if (!marker) {
+        marker = L.marker(newLatLng).addTo(map);
+      } else {
+        marker.setLatLng(newLatLng);
+      }
+
+      // Add to path polyline
+      path.addLatLng(newLatLng);
+
+      // Center map
+      map.setView(newLatLng, 16);
+
+      // Enable download buttons
+      if (coords.length > 1) {
+        downloadCSV.disabled = false;
+        downloadGPX.disabled = false;
+      }
+    }
+
+    function error(err) {
+      const messages = {
+        1: "❌ User denied the request for Geolocation.",
+        2: "⚠️ Location information is unavailable.",
+        3: "⏳ The request to get user location timed out.",
+      };
+      x.textContent = messages[err.code] || "❓ An unknown error occurred.";
+    }
+
+    function stopTracking() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        startBtn.disabled = false;
+        x.innerHTML += "<br><span style='color:red'><b>Tracking stopped.</b></span>";
+      }
+    }
+
+    // Download as CSV
+    function saveCSV() {
+      let csv = "Latitude,Longitude,Accuracy,Timestamp\n";
+      coords.forEach(c => {
+        csv += `${c.lat},${c.lon},${c.acc},${c.time}\n`;
+      });
+      downloadFile("track.csv", csv, "text/csv");
+    }
+
+    // Download as GPX
+    function saveGPX() {
+      let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GeoTracker" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>GPS Track</name>
+    <trkseg>`;
+      coords.forEach(c => {
+        gpx += `\n      <trkpt lat="${c.lat}" lon="${c.lon}">
+        <time>${c.time}</time>
+      </trkpt>`;
+      });
+      gpx += `
+    </trkseg>
+  </trk>
+</gpx>`;
+      downloadFile("track.gpx", gpx, "application/gpx+xml");
+    }
+
+    // Helper for downloading
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+
+</body>
+</html>
