@@ -132,6 +132,7 @@ function startTracking() {
 function updatePosition(position) {
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
+  const acc = position.coords.accuracy.toFixed(1); // accuracy in meters
 
   marker.setLatLng([lat, lon]);
   map.setView([lat, lon]);
@@ -145,8 +146,9 @@ function updatePosition(position) {
     }
   }
 
-  statusEl.innerText = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
+  statusEl.innerText = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}, ±${acc}m`;
 }
+
 
 function geoError(error) {
   statusEl.innerText = "⚠️ Error getting location: " + error.message;
