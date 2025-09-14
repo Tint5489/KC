@@ -128,11 +128,19 @@ function startTracking() {
   enableWakeLock();
 }
 
-// Update live marker and optionally record path
+// Update live marker and optionally record path (with speed display)
 function updatePosition(position) {
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
   const acc = position.coords.accuracy.toFixed(1); // accuracy in meters
+  
+  // Speed in m/s, convert to km/h
+  const rawSpeed = position.coords.speed;
+  let speedText = "";
+  if (typeof rawSpeed === "number" && !isNaN(rawSpeed)) {
+    const speedKmh = (rawSpeed * 3.6).toFixed(2);
+    speedText = `, Speed: ${speedKmh} km/h`;
+  }
 
   marker.setLatLng([lat, lon]);
   map.setView([lat, lon]);
@@ -146,9 +154,8 @@ function updatePosition(position) {
     }
   }
 
-  statusEl.innerText = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}, ±${acc}m`;
+  statusEl.innerText = `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}, ±${acc}m${speedText}`;
 }
-
 
 function geoError(error) {
   statusEl.innerText = "⚠️ Error getting location: " + error.message;
