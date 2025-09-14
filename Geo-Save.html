@@ -3,272 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mobile Geolocation with Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+  <title>Geo Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body {
-      font-family: Arial, Helvetica, sans-serif;
-      background: #f8f9fa;
       margin: 0;
       height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
+      background: #f0f2f5;
+      font-family: "Segoe UI", sans-serif;
     }
-
     .card {
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      width: min(95%, 420px);
       padding: 20px;
       text-align: center;
-      width: min(95%, 520px);
       display: flex;
       flex-direction: column;
       gap: 15px;
     }
-
     h1 {
       margin: 0;
-      font-size: 1.6em;
+      font-size: 1.4em;
+      color: #333;
     }
-
-    #demo {
-      font-size: 18px;
-      font-weight: bold;
-      color: #222;
-      min-height: 60px;
-    }
-
-    .btn-container {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    button {
-      flex: 1;
-      min-width: 120px;
-      padding: 12px 18px;
-      font-size: 16px;
-      border: none;
-      border-radius: 12px;
-      color: white;
-      background: linear-gradient(135deg, #007bff, #0056b3);
-      cursor: pointer;
-      transition: transform 0.2s ease, background 0.3s;
-    }
-
-    button:hover {
-      background: linear-gradient(135deg, #0056b3, #003f7f);
-      transform: translateY(-2px);
-    }
-
-    button:disabled {
-      background: #999;
-      cursor: not-allowed;
-      transform: none;
-    }
-
     #map {
-      height: 320px;
+      height: 300px;
+      width: 100%;
       border-radius: 12px;
-      overflow: hidden;
+    }
+    button {
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      color: white;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .start { background: linear-gradient(135deg, #4CAF50, #388E3C); }
+    .stop { background: linear-gradient(135deg, #f44336, #d32f2f); }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+    #status {
+      font-size: 14px;
+      color: #555;
+      margin-top: 5px;
     }
   </style>
 </head>
 <body>
-
   <div class="card">
-    <h1>📍 Mobile Geolocation</h1>
-    <p>Your coordinates will appear below:</p>
-
-    <div class="btn-container">
-      <button id="startBtn">▶ Start</button>
-      <button id="stopBtn">⏹ Stop</button>
-      <button id="clearBtn">🧹 Clear Path</button>
-    </div>
-
-    <p id="demo" role="status" aria-live="polite">Fetching location...</p>
+    <h1>📍 Geo Tracker</h1>
     <div id="map"></div>
-
-    <div class="btn-container">
-      <button id="downloadCSV" disabled>⬇️ Download CSV</button>
-      <button id="downloadGPX" disabled>⬇️ Download GPX</button>
+    <div>
+      <button class="start" onclick="startRecording()">Start Recording</button>
+      <button class="stop" onclick="stopRecording()">Stop Recording</button>
     </div>
+    <p id="status">Tracking location…</p>
   </div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    const x = document.getElementById("demo");
-    const startBtn = document.getElementById("startBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const clearBtn = document.getElementById("clearBtn");
-    const downloadCSV = document.getElementById("downloadCSV");
-    const downloadGPX = document.getElementById("downloadGPX");
-
-    let watchId = null;
-    let map, marker, path;
-    let coords = [];
-    let wakeLock = null;
+    let map, marker, pathLine;
+    let recording = false;
+    let recordedCoords = [];
 
     // Initialize map
-    function initMap() {
-      map = L.map("map").setView([51.505, -0.09], 13);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
-      path = L.polyline([], { color: "red", weight: 4 }).addTo(map);
-    }
-    initMap();
+    map = L.map('map').setView([51.505, -0.09], 15); // Default London
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map);
 
-    window.onload = () => startTracking();
+    // Marker for live position
+    marker = L.marker([51.505, -0.09]).addTo(map);
 
-    startBtn.addEventListener("click", startTracking);
-    stopBtn.addEventListener("click", stopTracking);
-    clearBtn.addEventListener("click", clearPath);
-    downloadCSV.addEventListener("click", saveCSV);
-    downloadGPX.addEventListener("click", saveGPX);
+    // Polyline for recorded path
+    pathLine = L.polyline([], {color: 'blue'}).addTo(map);
 
-    // Wake Lock API
-    async function enableWakeLock() {
-      try {
-        wakeLock = await navigator.wakeLock.request("screen");
-        wakeLock.addEventListener("release", () => {
-          console.log("Wake Lock released");
-        });
-        console.log("Wake Lock active");
-      } catch (err) {
-        console.error("Wake Lock failed:", err);
-      }
-    }
-
-    function disableWakeLock() {
-      if (wakeLock) {
-        wakeLock.release();
-        wakeLock = null;
-      }
-    }
-
-    function startTracking() {
-      if (!navigator.geolocation) {
-        x.textContent = "❌ Geolocation is not supported by this browser.";
-        return;
-      }
-      if (watchId !== null) {
-        x.innerHTML = "<span style='color:green'><b>Already tracking.</b></span>";
-        return;
-      }
-      const options = {
+    // Start geolocation tracking automatically
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(updatePosition, geoError, {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
-      };
-      watchId = navigator.geolocation.watchPosition(success, error, options);
-      startBtn.disabled = true;
-      x.textContent = "Starting location tracking...";
-      enableWakeLock(); // prevent screen from sleeping
-    }
-
-    function success(position) {
-      const lat = position.coords.latitude.toFixed(6);
-      const lon = position.coords.longitude.toFixed(6);
-      const acc = position.coords.accuracy.toFixed(1);
-      const time = new Date(position.timestamp);
-
-      x.innerHTML = `Latitude: ${lat}<br>Longitude: ${lon}
-                     <br><small>Accuracy: ±${acc}m</small>
-                     <br><small>Updated: ${time.toLocaleTimeString()}</small>`;
-
-      const newLatLng = [parseFloat(lat), parseFloat(lon)];
-      coords.push({ lat, lon, acc, time: time.toISOString() });
-
-      if (!marker) {
-        marker = L.marker(newLatLng).addTo(map);
-      } else {
-        marker.setLatLng(newLatLng);
-      }
-
-      path.addLatLng(newLatLng);
-      map.setView(newLatLng, 16);
-
-      if (coords.length > 1) {
-        downloadCSV.disabled = false;
-        downloadGPX.disabled = false;
-      }
-    }
-
-    function error(err) {
-      const messages = {
-        1: "❌ User denied the request for Geolocation.",
-        2: "⚠️ Location information is unavailable.",
-        3: "⏳ The request to get user location timed out.",
-      };
-      x.textContent = messages[err.code] || "❓ An unknown error occurred.";
-    }
-
-    function stopTracking() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-        startBtn.disabled = false;
-        x.innerHTML += "<br><span style='color:red'><b>Tracking stopped.</b></span>";
-        disableWakeLock(); // allow screen to sleep again
-      }
-    }
-
-    function clearPath() {
-      coords = [];
-      path.setLatLngs([]);
-      if (marker) {
-        map.removeLayer(marker);
-        marker = null;
-      }
-      x.textContent = "Path cleared.";
-      downloadCSV.disabled = true;
-      downloadGPX.disabled = true;
-    }
-
-    function saveCSV() {
-      let csv = "Latitude,Longitude,Accuracy,Timestamp\n";
-      coords.forEach(c => {
-        csv += `${c.lat},${c.lon},${c.acc},${c.time}\n`;
+        maximumAge: 5000,
+        timeout: 10000
       });
-      downloadFile("track.csv", csv, "text/csv");
+    } else {
+      document.getElementById("status").innerText = "❌ Geolocation not supported.";
     }
 
-    function saveGPX() {
-      let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GeoTracker" xmlns="http://www.topografix.com/GPX/1/1">
-  <trk>
-    <name>GPS Track</name>
-    <trkseg>`;
-      coords.forEach(c => {
-        gpx += `\n      <trkpt lat="${c.lat}" lon="${c.lon}">
-        <time>${c.time}</time>
-      </trkpt>`;
-      });
-      gpx += `
-    </trkseg>
-  </trk>
-</gpx>`;
-      downloadFile("track.gpx", gpx, "application/gpx+xml");
+    function updatePosition(position) {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      // Update marker position
+      marker.setLatLng([lat, lon]);
+      map.setView([lat, lon]);
+
+      // If recording, add to path
+      if (recording) {
+        recordedCoords.push([lat, lon]);
+        pathLine.setLatLngs(recordedCoords);
+      }
+
+      document.getElementById("status").innerText =
+        `Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`;
     }
 
-    function downloadFile(filename, content, type) {
-      const blob = new Blob([content], { type });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    function geoError(error) {
+      document.getElementById("status").innerText =
+        "⚠️ Error getting location: " + error.message;
+    }
+
+    function startRecording() {
+      recording = true;
+      recordedCoords = []; // reset
+      pathLine.setLatLngs([]);
+      document.getElementById("status").innerText = "🟢 Recording started.";
+    }
+
+    function stopRecording() {
+      recording = false;
+      document.getElementById("status").innerText = "⏹ Recording stopped.";
     }
   </script>
-
 </body>
 </html>
