@@ -18,13 +18,13 @@
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.9); /* Slight transparency */
+      background: rgba(255, 255, 255, 0.9);
       border-radius: 20px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
       padding: 30px;
       width: min(90%, 400px);
       text-align: center;
-      backdrop-filter: blur(6px); /* Frosted glass effect */
+      backdrop-filter: blur(6px);
     }
 
     h1 {
@@ -44,14 +44,25 @@
       padding: 12px;
       border-radius: 12px;
       border: none;
-      background: linear-gradient(135deg, #4CAF50, #388E3C);
       color: white;
       cursor: pointer;
       transition: all 0.3s ease;
     }
 
+    /* Default styles */
+    .geo { background: linear-gradient(135deg, #4CAF50, #388E3C); }
+    .password { background: linear-gradient(135deg, #f44336, #d32f2f); }
+    .books { background: linear-gradient(135deg, #ff9800, #ef6c00); }
+    .test { background: linear-gradient(135deg, #2196f3, #1976d2); }
+
+    /* Hover colors */
+    .geo:hover { background: linear-gradient(135deg, #66bb6a, #43a047); }
+    .password:hover { background: linear-gradient(135deg, #e57373, #c62828); }
+    .books:hover { background: linear-gradient(135deg, #ffb74d, #f57c00); }
+    .test:hover { background: linear-gradient(135deg, #64b5f6, #1565c0); }
+
+    /* Hover animation */
     button:hover {
-      background: linear-gradient(135deg, #45a049, #2e7d32);
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
@@ -66,12 +77,11 @@
   <div class="card">
     <h1>📱 Choose a Program</h1>
     <div class="btn-container">
-      <button onclick="window.location.href='Geo.html'">Open Geo</button>
-      <button onclick="window.location.href='Password.html'">Open Redundancy</button>
-      <button onclick="window.location.href='Books.html'">Open Books</button>
-      <button onclick="window.location.href='Geo-StopStart.html'">Geo Map</button>
+      <button class="geo" onclick="window.location.href='Geo.html'">Geo</button>
+      <button class="password" onclick="window.location.href='Password.html'">Redundancy</button>
+      <button class="books" onclick="window.location.href='Books.html'">Books</button>
+      <button class="test" onclick="window.location.href='Geo-StopStart.html'">Geo Map</button>
     </div>
   </div>
 </body>
 </html>
-
