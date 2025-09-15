@@ -90,6 +90,9 @@ let recording = false;
 let recordedCoords = [];
 let wakeLock = null;
 
+let lastRecordTime = 0; // Timestamp of last recorded coordinate
+let watchId = null;
+
 // Initialize map
 map = L.map('map').setView([51.505, -0.09], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
@@ -119,13 +122,29 @@ function startTracking() {
     return;
   }
 
-  navigator.geolocation.watchPosition(updatePosition, geoError, {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+  }
+  watchId = navigator.geolocation.watchPosition(updatePosition, geoError, {
     enableHighAccuracy: true,
     maximumAge: 5000,
     timeout: 10000
   });
 
-  enableWakeLock();
+  // Initial wake lock request
+enableWakeLock();
+
+// Re-request wake lock every 5 minutes (300000 ms)
+setInterval(enableWakeLock, 300000);
+}
+
+// Variable interval recording logic
+function getRecordingInterval(speedKmh) {
+  if (typeof speedKmh !== "number" || isNaN(speedKmh)) return 3000; // default: 3s if no speed
+  if (speedKmh < 3) return 3000;      // Below 3km/h: every 3s
+  if (speedKmh > 80) return 20000;    // Over 80km/h: every 20s
+  if (speedKmh > 30) return 10000;    // Over 30km/h: every 10s
+  return 3000; // Between 3-30km/h: every 3s
 }
 
 // Update live marker and optionally record path (with speed display)
@@ -133,24 +152,31 @@ function updatePosition(position) {
   const lat = position.coords.latitude;
   const lon = position.coords.longitude;
   const acc = position.coords.accuracy.toFixed(1); // accuracy in meters
-  
+
   // Speed in m/s, convert to km/h
   const rawSpeed = position.coords.speed;
+  let speedKmh = 0;
   let speedText = "";
   if (typeof rawSpeed === "number" && !isNaN(rawSpeed)) {
-    const speedKmh = (rawSpeed * 3.6).toFixed(2);
-    speedText = `, Speed: ${speedKmh} km/h`;
+    speedKmh = rawSpeed * 3.6;
+    speedText = `, Speed: ${speedKmh.toFixed(2)} km/h`;
   }
 
   marker.setLatLng([lat, lon]);
   map.setView([lat, lon]);
 
+  // Variable recording interval logic
   if (recording) {
-    recordedCoords.push({lat, lon});
-    pathLine.setLatLngs(recordedCoords.map(c => [c.lat, c.lon]));
-    if (recordedCoords.length > 1) {
-      csvBtn.disabled = false;
-      gpxBtn.disabled = false;
+    const now = Date.now();
+    const interval = getRecordingInterval(speedKmh);
+    if (now - lastRecordTime >= interval) {
+      recordedCoords.push({lat, lon, speed: speedKmh, accuracy: acc, time: new Date().toISOString()});
+      pathLine.setLatLngs(recordedCoords.map(c => [c.lat, c.lon]));
+      lastRecordTime = now;
+      if (recordedCoords.length > 1) {
+        csvBtn.disabled = false;
+        gpxBtn.disabled = false;
+      }
     }
   }
 
@@ -166,6 +192,7 @@ function startRecording() {
   recording = true;
   recordedCoords = [];
   pathLine.setLatLngs([]);
+  lastRecordTime = 0;
   statusEl.innerText = "🟢 Recording started.";
   csvBtn.disabled = true;
   gpxBtn.disabled = true;
@@ -176,7 +203,6 @@ function stopRecording() {
   statusEl.innerText = "⏹ Recording stopped.";
 }
 
-// Clear path
 function clearPath() {
   recording = false;
   recordedCoords = [];
@@ -188,9 +214,9 @@ function clearPath() {
 
 // Download CSV
 function downloadCSVFile() {
-  let csv = "Latitude,Longitude\n";
+  let csv = "Latitude,Longitude,Speed(km/h),Accuracy(m),Time\n";
   recordedCoords.forEach(c => {
-    csv += `${c.lat},${c.lon}\n`;
+    csv += `${c.lat},${c.lon},${c.speed || ""},${c.accuracy || ""},${c.time || ""}\n`;
   });
   downloadFile("track.csv", csv, "text/csv");
 }
@@ -203,7 +229,11 @@ function downloadGPXFile() {
     <name>GPS Track</name>
     <trkseg>`;
   recordedCoords.forEach(c => {
-    gpx += `\n      <trkpt lat="${c.lat}" lon="${c.lon}"></trkpt>`;
+    gpx += `\n      <trkpt lat="${c.lat}" lon="${c.lon}">
+        ${c.time ? `<time>${c.time}</time>` : ""}
+        ${c.speed ? `<speed>${c.speed}</speed>` : ""}
+        ${c.accuracy ? `<accuracy>${c.accuracy}</accuracy>` : ""}
+      </trkpt>`;
   });
   gpx += `
     </trkseg>

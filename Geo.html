@@ -56,17 +56,30 @@ const downloadBtn = document.getElementById("downloadBtn");
 let watchId = null;
 let gpxPoints = [];
 let wakeLock = null;
+let wakeLockTimer = null;
+let lastRecordTime = null;
 
-// Wake lock to keep screen awake
+// Wake lock to keep screen awake, re-request every 5 minutes
 async function enableWakeLock() {
   try {
+    if (wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
     wakeLock = await navigator.wakeLock?.request("screen");
     if (wakeLock) wakeLock.addEventListener('release', () => console.log('Screen unlocked'));
+    // Setup periodic re-request every 5 minutes
+    if (wakeLockTimer) clearInterval(wakeLockTimer);
+    wakeLockTimer = setInterval(enableWakeLock, 5 * 60 * 1000); // 5 minutes
   } catch (err) {
     console.warn("Wake Lock not supported:", err);
   }
 }
 function disableWakeLock() {
+  if (wakeLockTimer) {
+    clearInterval(wakeLockTimer);
+    wakeLockTimer = null;
+  }
   if (wakeLock) { wakeLock.release(); wakeLock = null; }
 }
 
@@ -87,6 +100,7 @@ function startTracking() {
   gpxPoints = [];
   downloadBtn.disabled = true;
   x.textContent = "Recording GPS points…";
+  lastRecordTime = null;
 
   enableWakeLock();
 }
@@ -139,8 +153,32 @@ function success(pos) {
   const acc = pos.coords.accuracy.toFixed(1);
   const time = pos.timestamp;
 
-  gpxPoints.push({lat, lon, time});
-  x.innerHTML = `Last point: ${lat}, ${lon}<br>Accuracy: ±${acc}m<br>Points recorded: ${gpxPoints.length}`;
+  // Speed in m/s, convert to km/h
+  const speed = pos.coords.speed !== null ? pos.coords.speed * 3.6 : null; // m/s to km/h
+
+  // Decide interval based on speed
+  let interval = 3 * 1000; // Default 3 seconds
+  if (speed !== null) {
+    if (speed >= 80) {
+      interval = 20 * 1000;
+    } else if (speed >= 30) {
+      interval = 10 * 1000;
+    } else if (speed >= 3) {
+      interval = 3 * 1000;
+    }
+    // else: below 3km/h, keep 3s
+  }
+
+  // Record only if enough time has passed
+  if (
+    !lastRecordTime || 
+    (time - lastRecordTime) >= interval
+  ) {
+    gpxPoints.push({lat, lon, time});
+    lastRecordTime = time;
+  }
+
+  x.innerHTML = `Last point: ${lat}, ${lon}<br>Accuracy: ±${acc}m<br>Speed: ${speed !== null ? speed.toFixed(1) : 'N/A'} km/h<br>Points recorded: ${gpxPoints.length}`;
 }
 
 // Error callback
