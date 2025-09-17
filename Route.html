@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPX Route Planner</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+  <title>GPX Route Viewer</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
     body {
       margin: 0;
@@ -19,169 +17,151 @@
     }
     #sidebar {
       flex: 1;
+      border-left: 1px solid #ccc;
       padding: 10px;
-      background: #f8f9fa;
       overflow-y: auto;
-      border-left: 1px solid #ddd;
+      background: #f9f9f9;
+    }
+    #sidebar h2 {
+      margin-top: 0;
     }
     table {
       width: 100%;
       border-collapse: collapse;
+      font-size: 14px;
     }
     th, td {
-      padding: 8px;
-      border-bottom: 1px solid #ddd;
+      padding: 6px;
+      border: 1px solid #ddd;
       text-align: left;
-    }
-    th {
-      background: #007bff;
-      color: white;
     }
     tr {
       cursor: grab;
-    }
-    tr.dragging {
-      background: #e3f2fd;
     }
     .numbered-marker div {
       background: #007bff;
       color: white;
       border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      line-height: 28px;
+      width: 26px;
+      height: 26px;
       text-align: center;
+      line-height: 26px;
       font-weight: bold;
       border: 2px solid white;
-      box-shadow: 0 0 3px rgba(0,0,0,0.6);
+    }
+    .stop-label {
+      background: white;
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 12px;
+      color: #333;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <div id="sidebar">
-    <h3>Stops</h3>
+    <h2>Stops</h2>
     <input type="file" id="gpxFile" accept=".gpx"><br><br>
-    <table>
+    <table id="stopsTable">
       <thead>
-        <tr>
-          <th>#</th>
-          <th>Stop Name</th>
-        </tr>
+        <tr><th>#</th><th>Name</th></tr>
       </thead>
-      <tbody id="stops"></tbody>
+      <tbody></tbody>
     </table>
   </div>
 
-<script>
-  const map = L.map("map").setView([51.505, -0.09], 13);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19
-  }).addTo(map);
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/togeojson"></script>
+  <script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script>
+    const map = L.map('map').setView([51.505, -0.09], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
 
-  let stops = [];
-  let routeLine = null;
-  let markers = [];
+    let stops = [];
+    let markers = [];
 
-  function updateMarkers() {
-    markers.forEach(m => map.removeLayer(m));
-    markers = [];
-    stops.forEach((stop, i) => {
-      const numberIcon = L.divIcon({
-        className: "numbered-marker",
-        html: `<div>${i + 1}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 30]
-      });
-      const marker = L.marker([stop.lat, stop.lon], { icon: numberIcon })
-        .addTo(map)
-        .bindPopup(stop.name);
-      markers.push(marker);
-    });
-    if (markers.length > 0) {
-      const group = L.featureGroup(markers);
-      map.fitBounds(group.getBounds(), { padding: [40, 40] });
+    document.getElementById("gpxFile").addEventListener("change", handleFile);
+
+    function handleFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(event.target.result, "text/xml");
+        const geojson = toGeoJSON.gpx(xmlDoc);
+
+        stops = geojson.features
+          .filter(f => f.geometry.type === "Point")
+          .map((f, i) => ({
+            name: f.properties.name || `Stop ${i+1}`,
+            lat: f.geometry.coordinates[1],
+            lon: f.geometry.coordinates[0]
+          }));
+
+        updateTable();
+        updateMarkers();
+      };
+      reader.readAsText(file);
     }
-  }
 
-  function buildRoute() {
-    if (routeLine) map.removeLayer(routeLine);
-    if (stops.length > 1) {
-      routeLine = L.polyline(stops.map(s => [s.lat, s.lon]), {
-        color: "blue",
-        weight: 3
-      }).addTo(map);
-      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
-    }
-    updateMarkers();
-  }
-
-  function renderStopsTable() {
-    const tbody = document.getElementById("stops");
-    tbody.innerHTML = "";
-    stops.forEach((stop, i) => {
-      const tr = document.createElement("tr");
-      tr.dataset.index = i;
-
-      const tdNum = document.createElement("td");
-      tdNum.textContent = i + 1;
-
-      const tdName = document.createElement("td");
-      tdName.textContent = stop.name;
-
-      tr.appendChild(tdNum);
-      tr.appendChild(tdName);
-      tbody.appendChild(tr);
-    });
-  }
-
-  // GPX file load
-  document.getElementById("gpxFile").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(evt.target.result, "application/xml");
-
-      stops = [];
-      // First try waypoints <wpt>
-      xmlDoc.querySelectorAll("wpt").forEach((wpt, idx) => {
-        const lat = parseFloat(wpt.getAttribute("lat"));
-        const lon = parseFloat(wpt.getAttribute("lon"));
-        const name = wpt.querySelector("name")?.textContent || `Stop ${idx + 1}`;
-        stops.push({ name, lat, lon });
+    function updateTable() {
+      const tbody = document.querySelector("#stopsTable tbody");
+      tbody.innerHTML = "";
+      stops.forEach((stop, i) => {
+        const row = document.createElement("tr");
+        row.dataset.index = i;
+        row.innerHTML = `<td>${i + 1}</td><td>${stop.name}</td>`;
+        tbody.appendChild(row);
       });
 
-      // If no waypoints, use trackpoints <trkpt>
-      if (stops.length === 0) {
-        xmlDoc.querySelectorAll("trkpt").forEach((pt, idx) => {
-          const lat = parseFloat(pt.getAttribute("lat"));
-          const lon = parseFloat(pt.getAttribute("lon"));
-          stops.push({ name: `Stop ${idx + 1}`, lat, lon });
+      // Make table sortable
+      Sortable.create(tbody, {
+        animation: 150,
+        onEnd: function () {
+          const newStops = [];
+          tbody.querySelectorAll("tr").forEach(row => {
+            const index = row.dataset.index;
+            newStops.push(stops[index]);
+          });
+          stops = newStops;
+          updateTable();
+          updateMarkers();
+        }
+      });
+    }
+
+    function updateMarkers() {
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      stops.forEach((stop, i) => {
+        const numberIcon = L.divIcon({
+          className: "numbered-marker",
+          html: `<div>${i + 1}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 30]
         });
-      }
 
-      renderStopsTable();
-      buildRoute();
-    };
-    reader.readAsText(file);
-  });
+        const marker = L.marker([stop.lat, stop.lon], { icon: numberIcon })
+          .addTo(map)
+          .bindTooltip(`${i + 1}. ${stop.name}`, { 
+            permanent: true,
+            direction: "top",
+            offset: [0, -35],
+            className: "stop-label"
+          });
 
-  // Make table sortable
-  new Sortable(document.getElementById("stops"), {
-    animation: 150,
-    onEnd: () => {
-      const newOrder = [];
-      document.querySelectorAll("#stops tr").forEach(tr => {
-        newOrder.push(stops[tr.dataset.index]);
+        markers.push(marker);
       });
-      stops = newOrder;
-      renderStopsTable();
-      buildRoute();
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [40, 40] });
+      }
     }
-  });
-</script>
+  </script>
 </body>
 </html>
