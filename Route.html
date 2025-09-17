@@ -11,18 +11,35 @@
     display: flex;
     height: 100vh;
     font-family: Arial, sans-serif;
+    flex-direction: row;
   }
-  #map { flex: 3; }
+  #map { flex: 3; min-width: 0; }
   #sidebar {
     flex: 1;
     border-left: 1px solid #ccc;
     padding: 10px;
     overflow-y: auto;
     background: #f9f9f9;
+    min-width: 240px;
   }
   #sidebar h2 { margin-top: 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { padding: 6px; border: 1px solid #ddd; text-align: left; }
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 16px;
+    min-width: 220px;
+    background: white;
+  }
+  th, td {
+    padding: 10px 8px;
+    border: 1px solid #ddd;
+    text-align: left;
+    font-size: 15px;
+  }
   tr { cursor: grab; }
   .numbered-marker div {
     background: #007bff;
@@ -43,7 +60,52 @@
     font-size: 12px;
     color: #333;
   }
-  button { margin-top: 10px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+  button {
+    margin-top: 10px;
+    padding: 12px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Responsive styles */
+  @media (max-width: 800px) {
+    body {
+      flex-direction: column;
+    }
+    #sidebar {
+      min-width: 0;
+      width: 100vw;
+      border-left: none;
+      border-top: 1px solid #ccc;
+      padding: 14px 8px;
+    }
+    #map {
+      flex: 2;
+      min-height: 300px;
+      height: 40vh;
+    }
+    .table-container {
+      margin-bottom: 8px;
+    }
+    th, td {
+      padding: 12px 6px;
+      font-size: 16px;
+    }
+  }
+  @media (max-width: 500px) {
+    table, th, td {
+      font-size: 14px;
+    }
+    button {
+      font-size: 15px;
+      padding: 10px;
+    }
+    #sidebar h2 {
+      font-size: 18px;
+    }
+  }
 </style>
 </head>
 <body>
@@ -51,12 +113,14 @@
 <div id="sidebar">
   <h2>Stops</h2>
   <input type="file" id="gpxFile" accept=".gpx"><br><br>
-  <table id="stopsTable">
-    <thead>
-      <tr><th>#</th><th>Name</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <div class="table-container">
+    <table id="stopsTable">
+      <thead>
+        <tr><th>#</th><th>Name</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
   <button id="downloadGpxBtn">Download Reordered GPX</button>
 </div>
 
@@ -149,36 +213,34 @@
   }
 
   function downloadGPX() {
-  const now = new Date();
-  const filename = `Stops-${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}-${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}.gpx`;
+    const now = new Date();
+    const filename = `Stops-${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}-${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}.gpx`;
 
-  let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+    let gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="GPXRouteViewer" xmlns="http://www.topografix.com/GPX/1/1">`;
 
-  stops.forEach((s, i) => {
-    gpx += `
+    stops.forEach((s, i) => {
+      gpx += `
   <wpt lat="${s.lat}" lon="${s.lon}">
     <name>${i+1}. ${s.name}</name>
   </wpt>`;
-  });
+    });
 
-  gpx += `
+    gpx += `
 </gpx>`;
 
-  const blob = new Blob([gpx], { type: "application/gpx+xml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
+    const blob = new Blob([gpx], { type: "application/gpx+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   downloadBtn.addEventListener("click", downloadGPX);
 </script>
 </body>
 </html>
-
