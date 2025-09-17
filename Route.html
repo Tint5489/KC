@@ -26,10 +26,12 @@
   .table-container {
     width: 100%;
     overflow-x: auto;
-    overflow-y: scroll !important; /* Force vertical scrollbar */
+    overflow-y: scroll !important;
+    -webkit-overflow-scrolling: touch;
     max-height: 400px;
     background: white;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
+    border-radius: 4px;
   }
   table {
     width: 100%;
@@ -37,7 +39,7 @@
     font-size: 16px;
     min-width: 260px;
     background: white;
-    /* table-layout: fixed; <-- REMOVE this so columns can be dynamic */
+    /* table-layout: auto; <-- Let columns size dynamically */
   }
   th, td {
     padding: 10px 8px;
@@ -52,9 +54,14 @@
     background: #f4f7fa;
     z-index: 2;
     box-shadow: 2px 0 8px -2px #bbb;
-    width: 1%; /* Dynamic, fits content */
+    width: 1%;
     white-space: nowrap;
     text-align: right;
+  }
+  th:nth-child(2), td:nth-child(2) {
+    width: auto;
+    white-space: nowrap;
+    text-align: left;
   }
   tr { cursor: grab; }
   .numbered-marker div {
@@ -107,7 +114,7 @@
     }
     .table-container {
       margin-bottom: 8px;
-      max-height: 300px; /* MORE height for mobile scroll */
+      max-height: 340px;
     }
     th, td {
       padding: 12px 6px;
@@ -116,13 +123,13 @@
   }
   @media (max-width: 600px) {
     table {
-      min-width: 320px;
+      min-width: 300px;
     }
     th, td {
       font-size: 14px;
     }
     .table-container {
-      max-height: 220px; /* MORE height for easier scroll */
+      max-height: 220px;
     }
   }
   @media (max-width: 500px) {
@@ -137,7 +144,7 @@
       font-size: 18px;
     }
     .table-container {
-      max-height: 160px; /* MORE height for easier scroll */
+      max-height: 160px;
     }
   }
 </style>
