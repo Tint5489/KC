@@ -6,7 +6,6 @@
   <title>GPX Route Planner</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-gpx"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
   <style>
     body {
@@ -84,7 +83,6 @@
   let routeLine = null;
   let markers = [];
 
-  // Update marker numbers
   function updateMarkers() {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
@@ -100,9 +98,12 @@
         .bindPopup(stop.name);
       markers.push(marker);
     });
+    if (markers.length > 0) {
+      const group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds(), { padding: [40, 40] });
+    }
   }
 
-  // Build route polyline
   function buildRoute() {
     if (routeLine) map.removeLayer(routeLine);
     if (stops.length > 1) {
@@ -110,12 +111,11 @@
         color: "blue",
         weight: 3
       }).addTo(map);
-      map.fitBounds(routeLine.getBounds());
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
     }
     updateMarkers();
   }
 
-  // Render stops in table
   function renderStopsTable() {
     const tbody = document.getElementById("stops");
     tbody.innerHTML = "";
@@ -142,26 +142,29 @@
 
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const gpxLayer = new L.GPX(evt.target.result, {
-        async: true,
-        marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null }
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(evt.target.result, "application/xml");
+
+      stops = [];
+      // First try waypoints <wpt>
+      xmlDoc.querySelectorAll("wpt").forEach((wpt, idx) => {
+        const lat = parseFloat(wpt.getAttribute("lat"));
+        const lon = parseFloat(wpt.getAttribute("lon"));
+        const name = wpt.querySelector("name")?.textContent || `Stop ${idx + 1}`;
+        stops.push({ name, lat, lon });
       });
 
-      gpxLayer.on("loaded", (evt) => {
-        const gpx = evt.target;
-        stops = [];
-        gpx.getLayers().forEach(layer => {
-          if (layer instanceof L.Marker) {
-            const latlng = layer.getLatLng();
-            const name = layer.getPopup()?.getContent() || `Stop ${stops.length + 1}`;
-            stops.push({ name, lat: latlng.lat, lon: latlng.lng });
-          }
+      // If no waypoints, use trackpoints <trkpt>
+      if (stops.length === 0) {
+        xmlDoc.querySelectorAll("trkpt").forEach((pt, idx) => {
+          const lat = parseFloat(pt.getAttribute("lat"));
+          const lon = parseFloat(pt.getAttribute("lon"));
+          stops.push({ name: `Stop ${idx + 1}`, lat, lon });
         });
-        renderStopsTable();
-        buildRoute();
-      });
+      }
 
-      gpxLayer.addTo(map);
+      renderStopsTable();
+      buildRoute();
     };
     reader.readAsText(file);
   });
