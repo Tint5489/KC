@@ -157,7 +157,7 @@
 
   let stops = [];
   let markers = [];
-  let sortable = null; // Track sortable instance
+  let sortable = null;
 
   const tbody = document.querySelector("#stopsTable tbody");
   const downloadBtn = document.getElementById("downloadGpxBtn");
@@ -182,23 +182,7 @@
         }));
 
       updateTable();
-
-      // Initialize Sortable only once
-      if (!sortable) {
-        sortable = Sortable.create(tbody, {
-          animation: 150,
-          onEnd: function() {
-            const newStops = [];
-            tbody.querySelectorAll("tr").forEach(row => {
-              const index = row.dataset.index;
-              newStops.push(stops[index]);
-            });
-            stops = newStops;
-            updateMarkers();
-            // Don't call updateTable() here, prevents Sortable breaking!
-          }
-        });
-      }
+      initSortable();
       updateMarkers();
     };
     reader.readAsText(file);
@@ -239,6 +223,24 @@
       const group = L.featureGroup(markers);
       map.fitBounds(group.getBounds(), { padding: [40,40] });
     }
+  }
+
+  function initSortable() {
+    if (sortable) sortable.destroy();
+    sortable = Sortable.create(tbody, {
+      animation: 150,
+      onEnd: function() {
+        const newStops = [];
+        tbody.querySelectorAll("tr").forEach(row => {
+          const index = row.dataset.index;
+          newStops.push(stops[index]);
+        });
+        stops = newStops;
+        updateTable();   // update the table row numbers!
+        updateMarkers(); // update map markers
+        initSortable();  // re-init sortable for new DOM
+      }
+    });
   }
 
   function downloadGPX() {
