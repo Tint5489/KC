@@ -28,19 +28,29 @@
     overflow-x: auto;
     overflow-y: auto;      /* Added for vertical scrolling */
     max-height: 400px;     /* Change this value as needed for sidebar height */
+    background: white;
   }
   table {
     width: 100%;
     border-collapse: collapse;
     font-size: 16px;
-    min-width: 220px;
+    min-width: 260px; /* Wider for scrolling */
     background: white;
+    table-layout: fixed;
   }
   th, td {
     padding: 10px 8px;
     border: 1px solid #ddd;
     text-align: left;
     font-size: 15px;
+    background: white;
+  }
+  th:first-child, td:first-child {
+    position: sticky;
+    left: 0;
+    background: #f4f7fa; /* Slight highlight for sticky column */
+    z-index: 2;
+    box-shadow: 2px 0 8px -2px #bbb;
   }
   tr { cursor: grab; }
   .numbered-marker div {
@@ -95,6 +105,17 @@
     th, td {
       padding: 12px 6px;
       font-size: 16px;
+    }
+  }
+  @media (max-width: 600px) {
+    table {
+      min-width: 320px;
+    }
+    th, td {
+      font-size: 14px;
+    }
+    .table-container {
+      max-height: 200px;
     }
   }
   @media (max-width: 500px) {
