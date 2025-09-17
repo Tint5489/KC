@@ -25,18 +25,24 @@
       overflow-y: auto;
       border-left: 1px solid #ddd;
     }
-    #stops {
-      list-style: none;
-      padding: 0;
-      margin: 0;
+    table {
+      width: 100%;
+      border-collapse: collapse;
     }
-    #stops li {
+    th, td {
       padding: 8px;
-      margin: 4px 0;
-      background: white;
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background: #007bff;
+      color: white;
+    }
+    tr {
       cursor: grab;
+    }
+    tr.dragging {
+      background: #e3f2fd;
     }
     .numbered-marker div {
       background: #007bff;
@@ -57,7 +63,15 @@
   <div id="sidebar">
     <h3>Stops</h3>
     <input type="file" id="gpxFile" accept=".gpx"><br><br>
-    <ul id="stops"></ul>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Stop Name</th>
+        </tr>
+      </thead>
+      <tbody id="stops"></tbody>
+    </table>
   </div>
 
 <script>
@@ -101,15 +115,23 @@
     updateMarkers();
   }
 
-  // Render stops list
-  function renderStopsList() {
-    const list = document.getElementById("stops");
-    list.innerHTML = "";
+  // Render stops in table
+  function renderStopsTable() {
+    const tbody = document.getElementById("stops");
+    tbody.innerHTML = "";
     stops.forEach((stop, i) => {
-      const li = document.createElement("li");
-      li.textContent = `${i + 1}. ${stop.name}`;
-      li.dataset.index = i;
-      list.appendChild(li);
+      const tr = document.createElement("tr");
+      tr.dataset.index = i;
+
+      const tdNum = document.createElement("td");
+      tdNum.textContent = i + 1;
+
+      const tdName = document.createElement("td");
+      tdName.textContent = stop.name;
+
+      tr.appendChild(tdNum);
+      tr.appendChild(tdName);
+      tbody.appendChild(tr);
     });
   }
 
@@ -135,7 +157,7 @@
             stops.push({ name, lat: latlng.lat, lon: latlng.lng });
           }
         });
-        renderStopsList();
+        renderStopsTable();
         buildRoute();
       });
 
@@ -144,16 +166,16 @@
     reader.readAsText(file);
   });
 
-  // Make stop list sortable
+  // Make table sortable
   new Sortable(document.getElementById("stops"), {
     animation: 150,
     onEnd: () => {
       const newOrder = [];
-      document.querySelectorAll("#stops li").forEach(li => {
-        newOrder.push(stops[li.dataset.index]);
+      document.querySelectorAll("#stops tr").forEach(tr => {
+        newOrder.push(stops[tr.dataset.index]);
       });
       stops = newOrder;
-      renderStopsList();
+      renderStopsTable();
       buildRoute();
     }
   });
