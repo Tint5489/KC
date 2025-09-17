@@ -26,17 +26,18 @@
   .table-container {
     width: 100%;
     overflow-x: auto;
-    overflow-y: auto;      /* Added for vertical scrolling */
-    max-height: 400px;     /* Change this value as needed for sidebar height */
+    overflow-y: scroll !important; /* Force vertical scrollbar */
+    max-height: 400px;
     background: white;
+    margin-bottom: 10px;
   }
   table {
     width: 100%;
     border-collapse: collapse;
     font-size: 16px;
-    min-width: 260px; /* Wider for scrolling */
+    min-width: 260px;
     background: white;
-    table-layout: fixed;
+    /* table-layout: fixed; <-- REMOVE this so columns can be dynamic */
   }
   th, td {
     padding: 10px 8px;
@@ -48,9 +49,12 @@
   th:first-child, td:first-child {
     position: sticky;
     left: 0;
-    background: #f4f7fa; /* Slight highlight for sticky column */
+    background: #f4f7fa;
     z-index: 2;
     box-shadow: 2px 0 8px -2px #bbb;
+    width: 1%; /* Dynamic, fits content */
+    white-space: nowrap;
+    text-align: right;
   }
   tr { cursor: grab; }
   .numbered-marker div {
@@ -80,13 +84,10 @@
     width: 100%;
     box-sizing: border-box;
   }
-
-  /* Highlight updated row for feedback (optional) */
   .updated-row {
     background: #e3f7ff;
     transition: background 0.5s;
   }
-
   /* Responsive styles */
   @media (max-width: 800px) {
     body {
@@ -106,7 +107,7 @@
     }
     .table-container {
       margin-bottom: 8px;
-      max-height: 240px; /* Adjust for small screens */
+      max-height: 300px; /* MORE height for mobile scroll */
     }
     th, td {
       padding: 12px 6px;
@@ -121,7 +122,7 @@
       font-size: 14px;
     }
     .table-container {
-      max-height: 200px;
+      max-height: 220px; /* MORE height for easier scroll */
     }
   }
   @media (max-width: 500px) {
@@ -134,6 +135,9 @@
     }
     #sidebar h2 {
       font-size: 18px;
+    }
+    .table-container {
+      max-height: 160px; /* MORE height for easier scroll */
     }
   }
 </style>
@@ -202,9 +206,8 @@
       row.innerHTML = `<td>${i+1}</td><td>${stop.name}</td>`;
       row.classList.add("updated-row");
       tbody.appendChild(row);
-      setTimeout(() => row.classList.remove("updated-row"), 500); // Optional highlight
+      setTimeout(() => row.classList.remove("updated-row"), 500);
     });
-    // Do not re-init Sortable here!
   }
 
   function updateMarkers() {
@@ -238,16 +241,15 @@
     sortable = Sortable.create(tbody, {
       animation: 150,
       onEnd: function() {
-        // Get the new order of stops from the table rows
         const newStops = [];
         tbody.querySelectorAll("tr").forEach(row => {
           const oldIndex = parseInt(row.dataset.index, 10);
           newStops.push(stops[oldIndex]);
         });
         stops = newStops;
-        updateTable();   // This will update the numbering correctly!
+        updateTable();
         updateMarkers();
-        initSortable();  // Re-init Sortable for new DOM
+        initSortable();
       }
     });
   }
