@@ -1,167 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPX Route Viewer</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-      height: 100vh;
-      font-family: Arial, sans-serif;
-    }
-    #map {
-      flex: 3;
-    }
-    #sidebar {
-      flex: 1;
-      border-left: 1px solid #ccc;
-      padding: 10px;
-      overflow-y: auto;
-      background: #f9f9f9;
-    }
-    #sidebar h2 {
-      margin-top: 0;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    th, td {
-      padding: 6px;
-      border: 1px solid #ddd;
-      text-align: left;
-    }
-    tr {
-      cursor: grab;
-    }
-    .numbered-marker div {
-      background: #007bff;
-      color: white;
-      border-radius: 50%;
-      width: 26px;
-      height: 26px;
-      text-align: center;
-      line-height: 26px;
-      font-weight: bold;
-      border: 2px solid white;
-    }
-    .stop-label {
-      background: white;
-      padding: 2px 5px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      font-size: 12px;
-      color: #333;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPX Route Viewer</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  body {
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    font-family: Arial, sans-serif;
+  }
+  #map { flex: 3; }
+  #sidebar {
+    flex: 1;
+    border-left: 1px solid #ccc;
+    padding: 10px;
+    overflow-y: auto;
+    background: #f9f9f9;
+  }
+  #sidebar h2 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 6px; border: 1px solid #ddd; text-align: left; }
+  tr { cursor: grab; }
+  .numbered-marker div {
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    text-align: center;
+    line-height: 26px;
+    font-weight: bold;
+    border: 2px solid white;
+  }
+  .stop-label {
+    background: white;
+    padding: 2px 5px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 12px;
+    color: #333;
+  }
+  button { margin-top: 10px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+</style>
 </head>
 <body>
-  <div id="map"></div>
-  <div id="sidebar">
-    <h2>Stops</h2>
-    <input type="file" id="gpxFile" accept=".gpx"><br><br>
-    <table id="stopsTable">
-      <thead>
-        <tr><th>#</th><th>Name</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+<div id="map"></div>
+<div id="sidebar">
+  <h2>Stops</h2>
+  <input type="file" id="gpxFile" accept=".gpx"><br><br>
+  <table id="stopsTable">
+    <thead>
+      <tr><th>#</th><th>Name</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <button id="downloadGpxBtn">Download Reordered GPX</button>
+</div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/togeojson"></script>
-  <script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
-  <script>
-    const map = L.map('map').setView([51.505, -0.09], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19
-    }).addTo(map);
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/togeojson"></script>
+<script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+  const map = L.map('map').setView([51.505, -0.09], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-    let stops = [];
-    let markers = [];
+  let stops = [];
+  let markers = [];
 
-    document.getElementById("gpxFile").addEventListener("change", handleFile);
+  const tbody = document.querySelector("#stopsTable tbody");
+  const downloadBtn = document.getElementById("downloadGpxBtn");
 
-    function handleFile(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(event.target.result, "text/xml");
-        const geojson = toGeoJSON.gpx(xmlDoc);
+  document.getElementById("gpxFile").addEventListener("change", handleFile);
 
-        stops = geojson.features
-          .filter(f => f.geometry.type === "Point")
-          .map((f, i) => ({
-            name: f.properties.name || `Stop ${i+1}`,
-            lat: f.geometry.coordinates[1],
-            lon: f.geometry.coordinates[0]
-          }));
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(event.target.result, "text/xml");
+      const geojson = toGeoJSON.gpx(xmlDoc);
 
+      stops = geojson.features
+        .filter(f => f.geometry.type === "Point")
+        .map((f,i) => ({
+          name: f.properties.name || `Stop ${i+1}`,
+          lat: f.geometry.coordinates[1],
+          lon: f.geometry.coordinates[0]
+        }));
+
+      updateTable();
+      updateMarkers();
+    };
+    reader.readAsText(file);
+  }
+
+  function updateTable() {
+    tbody.innerHTML = "";
+    stops.forEach((stop, i) => {
+      const row = document.createElement("tr");
+      row.dataset.index = i;
+      row.innerHTML = `<td>${i+1}</td><td>${stop.name}</td>`;
+      tbody.appendChild(row);
+    });
+
+    Sortable.create(tbody, {
+      animation: 150,
+      onEnd: function() {
+        const newStops = [];
+        tbody.querySelectorAll("tr").forEach(row => {
+          const index = row.dataset.index;
+          newStops.push(stops[index]);
+        });
+        stops = newStops;
         updateTable();
         updateMarkers();
-      };
-      reader.readAsText(file);
-    }
-
-    function updateTable() {
-      const tbody = document.querySelector("#stopsTable tbody");
-      tbody.innerHTML = "";
-      stops.forEach((stop, i) => {
-        const row = document.createElement("tr");
-        row.dataset.index = i;
-        row.innerHTML = `<td>${i + 1}</td><td>${stop.name}</td>`;
-        tbody.appendChild(row);
-      });
-
-      // Make table sortable
-      Sortable.create(tbody, {
-        animation: 150,
-        onEnd: function () {
-          const newStops = [];
-          tbody.querySelectorAll("tr").forEach(row => {
-            const index = row.dataset.index;
-            newStops.push(stops[index]);
-          });
-          stops = newStops;
-          updateTable();
-          updateMarkers();
-        }
-      });
-    }
-
-    function updateMarkers() {
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
-      stops.forEach((stop, i) => {
-        const numberIcon = L.divIcon({
-          className: "numbered-marker",
-          html: `<div>${i + 1}</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 30]
-        });
-
-        const marker = L.marker([stop.lat, stop.lon], { icon: numberIcon })
-          .addTo(map)
-          .bindTooltip(`${i + 1}. ${stop.name}`, { 
-            permanent: true,
-            direction: "top",
-            offset: [0, -35],
-            className: "stop-label"
-          });
-
-        markers.push(marker);
-      });
-      if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds(), { padding: [40, 40] });
       }
+    });
+  }
+
+  function updateMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+    stops.forEach((stop, i) => {
+      const numberIcon = L.divIcon({
+        className: "numbered-marker",
+        html: `<div>${i+1}</div>`,
+        iconSize: [30,30],
+        iconAnchor: [15,30]
+      });
+      const marker = L.marker([stop.lat, stop.lon], { icon: numberIcon })
+        .addTo(map)
+        .bindTooltip(`${i+1}. ${stop.name}`, { 
+          permanent: true,
+          direction: "top",
+          offset: [0,-35],
+          className: "stop-label"
+        });
+      markers.push(marker);
+    });
+    if (markers.length > 0) {
+      const group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds(), { padding: [40,40] });
     }
-  </script>
+  }
+
+  function downloadGPX() {
+  const now = new Date();
+  const filename = `track-${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}-${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}.gpx`;
+
+  let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GPXRouteViewer" xmlns="http://www.topografix.com/GPX/1/1">`;
+
+  stops.forEach((s, i) => {
+    gpx += `
+  <wpt lat="${s.lat}" lon="${s.lon}">
+    <name>${i+1}. ${s.name}</name>
+  </wpt>`;
+  });
+
+  gpx += `
+</gpx>`;
+
+  const blob = new Blob([gpx], { type: "application/gpx+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+  downloadBtn.addEventListener("click", downloadGPX);
+</script>
 </body>
 </html>
