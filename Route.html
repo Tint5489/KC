@@ -81,6 +81,12 @@
     box-sizing: border-box;
   }
 
+  /* Highlight updated row for feedback (optional) */
+  .updated-row {
+    background: #e3f7ff;
+    transition: background 0.5s;
+  }
+
   /* Responsive styles */
   @media (max-width: 800px) {
     body {
@@ -194,9 +200,11 @@
       const row = document.createElement("tr");
       row.dataset.index = i;
       row.innerHTML = `<td>${i+1}</td><td>${stop.name}</td>`;
+      row.classList.add("updated-row");
       tbody.appendChild(row);
+      setTimeout(() => row.classList.remove("updated-row"), 500); // Optional highlight
     });
-    // Don't re-create Sortable here!
+    // Do not re-init Sortable here!
   }
 
   function updateMarkers() {
@@ -230,15 +238,16 @@
     sortable = Sortable.create(tbody, {
       animation: 150,
       onEnd: function() {
+        // Get the new order of stops from the table rows
         const newStops = [];
         tbody.querySelectorAll("tr").forEach(row => {
-          const index = row.dataset.index;
-          newStops.push(stops[index]);
+          const oldIndex = parseInt(row.dataset.index, 10);
+          newStops.push(stops[oldIndex]);
         });
         stops = newStops;
-        updateTable();   // update the table row numbers!
-        updateMarkers(); // update map markers
-        initSortable();  // re-init sortable for new DOM
+        updateTable();   // This will update the numbering correctly!
+        updateMarkers();
+        initSortable();  // Re-init Sortable for new DOM
       }
     });
   }
