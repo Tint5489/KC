@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPX Route Planner</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <style>
+    body { margin: 0; height: 100vh; display: flex; }
+    #map { flex: 3; }
+    #sidebar {
+      flex: 1;
+      padding: 10px;
+      background: #f9f9f9;
+      overflow-y: auto;
+      border-left: 1px solid #ccc;
+    }
+    h2 { margin-top: 0; }
+    ul { list-style: none; padding: 0; }
+    li {
+      padding: 5px 10px;
+      background: #eee;
+      margin-bottom: 5px;
+      border-radius: 5px;
+      cursor: grab;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="sidebar">
+  <h2>Stops</h2>
+  <input type="file" id="gpxFile" accept=".gpx" />
+  <ul id="stopsList"></ul>
+  <button onclick="recalculateRoute()">Recalculate Route</button>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-gpx"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+let map = L.map('map').setView([51.5, -0.1], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+let routingControl = null;
+let stops = []; // array of {name, lat, lon}
+
+// Handle GPX upload
+document.getElementById("gpxFile").addEventListener("change", function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const gpxLayer = new L.GPX(e.target.result, {
+      async: true,
+      marker_options: { startIconUrl: null, endIconUrl: null, shadowUrl: null }
+    }).on("loaded", function(evt) {
+      map.fitBounds(evt.target.getBounds());
+      
+      // Extract waypoints
+      const gpx = evt.target;
+      stops = [];
+      gpx.getLayers().forEach(layer => {
+        if (layer instanceof L.Marker) {
+          const latlng = layer.getLatLng();
+          const name = layer.getPopup()?.getContent() || `Stop ${stops.length+1}`;
+          stops.push({ name, lat: latlng.lat, lon: latlng.lng });
+        }
+      });
+      renderStopsList();
+      buildRoute();
+    });
+    gpxLayer.addTo(map);
+  };
+  reader.readAsText(file);
+});
+
+// Render stops in sidebar
+function renderStopsList() {
+  const list = document.getElementById("stopsList");
+  list.innerHTML = "";
+  stops.forEach((s, i) => {
+    const li = document.createElement("li");
+    li.textContent = s.name;
+    li.dataset.index = i;
+    list.appendChild(li);
+  });
+  // Make list sortable
+  Sortable.create(list, {
+    onEnd: function() {
+      const newStops = [];
+      list.querySelectorAll("li").forEach(li => {
+        newStops.push(stops[li.dataset.index]);
+      });
+      stops = newStops;
+      buildRoute();
+    }
+  });
+}
+
+// Build or rebuild route
+function buildRoute() {
+  if (routingControl) {
+    map.removeControl(routingControl);
+  }
+  if (stops.length < 2) return;
+  routingControl = L.Routing.control({
+    waypoints: stops.map(s => L.latLng(s.lat, s.lon)),
+    routeWhileDragging: true
+  }).addTo(map);
+}
+
+function recalculateRoute() {
+  buildRoute();
+}
+</script>
+</body>
+</html>
