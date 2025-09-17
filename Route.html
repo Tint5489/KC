@@ -26,6 +26,8 @@
   .table-container {
     width: 100%;
     overflow-x: auto;
+    overflow-y: auto;      /* Added for vertical scrolling */
+    max-height: 400px;     /* Change this value as needed for sidebar height */
   }
   table {
     width: 100%;
@@ -88,6 +90,7 @@
     }
     .table-container {
       margin-bottom: 8px;
+      max-height: 240px; /* Adjust for small screens */
     }
     th, td {
       padding: 12px 6px;
@@ -133,6 +136,7 @@
 
   let stops = [];
   let markers = [];
+  let sortable = null; // Track sortable instance
 
   const tbody = document.querySelector("#stopsTable tbody");
   const downloadBtn = document.getElementById("downloadGpxBtn");
@@ -157,6 +161,23 @@
         }));
 
       updateTable();
+
+      // Initialize Sortable only once
+      if (!sortable) {
+        sortable = Sortable.create(tbody, {
+          animation: 150,
+          onEnd: function() {
+            const newStops = [];
+            tbody.querySelectorAll("tr").forEach(row => {
+              const index = row.dataset.index;
+              newStops.push(stops[index]);
+            });
+            stops = newStops;
+            updateMarkers();
+            // Don't call updateTable() here, prevents Sortable breaking!
+          }
+        });
+      }
       updateMarkers();
     };
     reader.readAsText(file);
@@ -170,20 +191,7 @@
       row.innerHTML = `<td>${i+1}</td><td>${stop.name}</td>`;
       tbody.appendChild(row);
     });
-
-    Sortable.create(tbody, {
-      animation: 150,
-      onEnd: function() {
-        const newStops = [];
-        tbody.querySelectorAll("tr").forEach(row => {
-          const index = row.dataset.index;
-          newStops.push(stops[index]);
-        });
-        stops = newStops;
-        updateTable();
-        updateMarkers();
-      }
-    });
+    // Don't re-create Sortable here!
   }
 
   function updateMarkers() {
