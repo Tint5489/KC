@@ -111,7 +111,7 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
   border-radius: 2px;
 }
 
-/* Mobile floating drawer */
+/* Mobile floating drawer fully off-screen */
 @media (max-width: 820px){
   #sidebar {
     position: absolute;
@@ -126,22 +126,15 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     z-index: 9999;  
     transition: transform 0.2s ease;
   }
-  #sidebar.collapsed { transform: translateX(200px); } /* collapsed offscreen */
-  #sidebar.dragging { transition: none; }
-  #sidebar #dragHandle {
-    position: absolute;
-    left: -20px;
-    top: 0;
-    width: 20px;
-    height: 100%;
-    cursor: grab;
-    background: rgba(0,0,0,0.1);
+  #sidebar.collapsed { 
+    transform: translateX(100%); /* fully off-screen */
   }
+  #sidebar.dragging { transition: none; }
 
   /* Arrow toggle button */
   #sidebarToggle {
     position: absolute;
-    left: -30px;
+    left: -30px; /* stick out left of sidebar's edge */
     top: 50%;
     transform: translateY(-50%);
     width: 30px;
@@ -156,7 +149,7 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     cursor: pointer;
     z-index: 10000;
   }
-  #sidebar.collapsed #sidebarToggle { left: 0; }
+  #sidebar.collapsed #sidebarToggle { left: -30px; } /* always visible */
 }
 </style>
 </head>
@@ -264,15 +257,15 @@ dragHandle.addEventListener("pointerdown", e=>{
 document.addEventListener("pointermove", e=>{
   if(!dragging) return;
   let dx=e.clientX-startX;
-  let newX=Math.min(220, Math.max(0, startTransform+dx));
+  let newX=Math.min(240, Math.max(0, startTransform+dx));
   sidebar.style.transform=`translateX(${newX}px)`;
 });
 document.addEventListener("pointerup", e=>{
   if(!dragging) return;
   dragging=false; sidebar.classList.remove("dragging");
   let style=getComputedStyle(sidebar); let tx=parseFloat(style.transform.split(",")[4]||style.transform.split("(")[1]);
-  if(tx>110) sidebar.style.transform=`translateX(200px)`; // snap collapsed
-  else sidebar.style.transform=`translateX(0px)`;       // snap open
+  if(tx>120) sidebar.style.transform=`translateX(100%)`; // snap fully off
+  else sidebar.style.transform=`translateX(0px)`;        // snap open
   setTimeout(()=>map.invalidateSize(),200);
 });
 </script>
