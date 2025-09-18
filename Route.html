@@ -48,20 +48,21 @@
 
   /* Collapse state */
   body.collapsed #sidebar {
-    width: auto;           /* auto fit content */
-    min-width: 0;
+    width: auto;           /* fit content */
     padding: 0;
   }
 
   body.collapsed .table-container {
+    width: auto;           /* fit content */
     max-height: none !important;
     border: none;
     box-shadow: none;
-    overflow: hidden;
+    overflow: visible;
   }
 
   body.collapsed table {
-    width: auto !important;  /* shrink table to content */
+    width: auto !important;       /* shrink table */
+    table-layout: auto !important; /* allow auto width */
   }
 
   body.collapsed th:first-child,
