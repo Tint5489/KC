@@ -1,330 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GPX Route Viewer</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<style>
-  body {
-    margin: 0;
-    display: flex;
-    height: 100vh;
-    font-family: Arial, sans-serif;
-    flex-direction: row;
-  }
-  #map { flex: 3; min-width: 0; }
-  #sidebar {
-    flex: 1;
-    border-left: 1px solid #ccc;
-    padding: 10px;
-    overflow-y: auto;
-    background: #f9f9f9;
-    min-width: 240px;
-    display: flex;
-    flex-direction: column;
-  }
-  #sidebar h2 { margin-top: 0; }
-
-  #resizeHandle {
-    height: 8px;
-    background: #ccc;
-    border-radius: 4px;
-    cursor: row-resize;
-    margin: 6px 0;
-    touch-action: none;
-  }
-
-  .table-container {
-    width: 100%;
-    overflow-x: auto;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    max-height: 400px;
-    height: 300px;
-    background: white;
-    margin-bottom: 14px;
-    border-radius: 4px;
-    border: 2px solid #dadada;
-    box-shadow: 0 2px 8px -2px #bbb;
-    padding-bottom: 10px;
-    touch-action: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #007bff #e3e3e3;
-  }
-
-  /* Custom scrollbars */
-  .table-container::-webkit-scrollbar {
-    width: 10px;
-  }
-  .table-container::-webkit-scrollbar-thumb {
-    background: #007bff;
-    border-radius: 8px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 16px;
-    min-width: 280px;
-    background: white;
-  }
-  th, td {
-    padding: 10px 8px;
-    border: 1px solid #ddd;
-    text-align: left;
-    font-size: 15px;
-    background: white;
-  }
-
-  /* Drag handle column */
-  th.handle-col, td.handle-col {
-    width: 32px;
-    text-align: center;
-    cursor: grab;
-    background: #f4f7fa;
-  }
-  .drag-handle {
-    font-size: 20px;
-    cursor: grab;
-    user-select: none;
-  }
-
-  th.num-col, td.num-col {
-    width: 1%;
-    text-align: right;
-    background: #f4f7fa;
-  }
-
-  .numbered-marker div {
-    background: #007bff;
-    color: white;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    text-align: center;
-    line-height: 26px;
-    font-weight: bold;
-    border: 2px solid white;
-  }
-  .stop-label {
-    background: white;
-    padding: 2px 5px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    font-size: 12px;
-    color: #333;
-  }
-  button {
-    margin-top: auto;
-    padding: 12px 16px;
-    font-size: 16px;
-    cursor: pointer;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .updated-row {
-    background: #e3f7ff;
-    transition: background 0.5s;
-  }
-
-  /* Responsive */
-  @media (max-width: 800px) {
-    body { flex-direction: column; }
-    #sidebar { width: 100vw; border-left: none; border-top: 1px solid #ccc; }
-    #map { flex: 2; min-height: 300px; height: 40vh; }
-    .table-container { max-height: 340px; }
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Stops Table with Resizer</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      flex: 1;
+    }
+    #sidebar {
+      width: 320px;
+      background: #f9f9f9;
+      border-left: 1px solid #ccc;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    #resizeHandle {
+      height: 16px;
+      cursor: row-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 6px 0;
+      touch-action: none;
+    }
+    /* Hamburger lines */
+    #resizeHandle div {
+      width: 24px;
+      height: 3px;
+      background: #888;
+      margin: 2px 0;
+      border-radius: 2px;
+    }
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      max-height: 250px; /* default */
+      height: 250px;
+      transition: height 0.1s ease-out;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: left;
+    }
+    th {
+      background: #eee;
+    }
+    .handle-col {
+      width: 30px;
+      cursor: grab;
+    }
+    .num-col {
+      width: 40px;
+    }
+  </style>
 </head>
 <body>
-<div id="map"></div>
-<div id="sidebar">
-  <h2>Stops</h2>
-  <input type="file" id="gpxFile" accept=".gpx"><br><br>
+  <div id="map"></div>
+  <div id="sidebar">
+    <h2>Stops</h2>
+    <input type="file" id="gpxFile" accept=".gpx"><br><br>
 
-  <!-- Resize handle -->
-  <div id="resizeHandle"></div>
+    <!-- Hamburger resize handle -->
+    <div id="resizeHandle">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
 
-  <div class="table-container" id="tableContainer">
-    <table id="stopsTable">
-      <thead>
-        <tr><th class="handle-col"></th><th class="num-col">#</th><th>Name</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-container" id="tableContainer">
+      <table id="stopsTable">
+        <thead>
+          <tr><th class="handle-col"></th><th class="num-col">#</th><th>Name</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <button id="downloadGpxBtn">Download Reordered GPX</button>
   </div>
 
-  <button id="downloadGpxBtn">Download Reordered GPX</button>
-</div>
+  <script>
+    // Table resize logic
+    const tableContainer = document.getElementById("tableContainer");
+    const resizeHandle = document.getElementById("resizeHandle");
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/togeojson"></script>
-<script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
-<script>
-  const map = L.map('map').setView([51.505, -0.09], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    let startY, startHeight;
 
-  let stops = [];
-  let markers = [];
-  let sortable = null;
-
-  const tbody = document.querySelector("#stopsTable tbody");
-  const downloadBtn = document.getElementById("downloadGpxBtn");
-
-  document.getElementById("gpxFile").addEventListener("change", handleFile);
-
-  function handleFile(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      const parser = new DOMParser();
-      const xmlDoc = parser.parseFromString(event.target.result, "text/xml");
-      const geojson = toGeoJSON.gpx(xmlDoc);
-
-      stops = geojson.features
-        .filter(f => f.geometry.type === "Point")
-        .map((f,i) => ({
-          name: f.properties.name || `Stop ${i+1}`,
-          lat: f.geometry.coordinates[1],
-          lon: f.geometry.coordinates[0]
-        }));
-
-      updateTable();
-      initSortable();
-      updateMarkers();
-    };
-    reader.readAsText(file);
-  }
-
-  function updateTable() {
-    tbody.innerHTML = "";
-    stops.forEach((stop, i) => {
-      const row = document.createElement("tr");
-      row.dataset.index = i;
-      row.innerHTML = `
-        <td class="handle-col"><span class="drag-handle">&#9776;</span></td>
-        <td class="num-col">${i+1}</td>
-        <td>${stop.name}</td>`;
-      row.classList.add("updated-row");
-      tbody.appendChild(row);
-      setTimeout(() => row.classList.remove("updated-row"), 500);
-    });
-  }
-
-  function updateMarkers() {
-    markers.forEach(m => map.removeLayer(m));
-    markers = [];
-    stops.forEach((stop, i) => {
-      const numberIcon = L.divIcon({
-        className: "numbered-marker",
-        html: `<div>${i+1}</div>`,
-        iconSize: [30,30],
-        iconAnchor: [15,30]
-      });
-      const marker = L.marker([stop.lat, stop.lon], { icon: numberIcon })
-        .addTo(map)
-        .bindTooltip(`${i+1}. ${stop.name}`, { 
-          permanent: true,
-          direction: "top",
-          offset: [0,-35],
-          className: "stop-label"
-        });
-      markers.push(marker);
-    });
-    if (markers.length > 0) {
-      const group = L.featureGroup(markers);
-      map.fitBounds(group.getBounds(), { padding: [40,40] });
+    function initResize(e) {
+      startY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
+      startHeight = parseInt(window.getComputedStyle(tableContainer).height, 10);
+      document.addEventListener("mousemove", doResize);
+      document.addEventListener("mouseup", stopResize);
+      document.addEventListener("touchmove", doResize, { passive: false });
+      document.addEventListener("touchend", stopResize);
+      e.preventDefault();
     }
-  }
 
-  function initSortable() {
-    if (sortable) sortable.destroy();
-    sortable = Sortable.create(tbody, {
-      animation: 150,
-      handle: ".drag-handle", // only drag via hamburger
-      onEnd: function() {
-        const newStops = [];
-        tbody.querySelectorAll("tr").forEach(row => {
-          const oldIndex = parseInt(row.dataset.index, 10);
-          newStops.push(stops[oldIndex]);
-        });
-        stops = newStops;
-        updateTable();
-        updateMarkers();
-        initSortable();
-      }
-    });
-  }
+    function doResize(e) {
+      const clientY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
+      const dy = startY - clientY;
+      let newHeight = startHeight + dy;
+      // clamp to min/max
+      if (newHeight < 100) newHeight = 100;
+      if (newHeight > 600) newHeight = 600;
+      tableContainer.style.maxHeight = newHeight + "px";
+      tableContainer.style.height = newHeight + "px";
+      e.preventDefault();
+    }
 
-  function downloadGPX() {
-    const now = new Date();
-    const filename = `Stops-${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}-${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}.gpx`;
+    function stopResize() {
+      document.removeEventListener("mousemove", doResize);
+      document.removeEventListener("mouseup", stopResize);
+      document.removeEventListener("touchmove", doResize);
+      document.removeEventListener("touchend", stopResize);
+    }
 
-    let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="GPXRouteViewer" xmlns="http://www.topografix.com/GPX/1/1">`;
-
-    stops.forEach((s, i) => {
-      gpx += `
-  <wpt lat="${s.lat}" lon="${s.lon}">
-    <name>${i+1}. ${s.name}</name>
-  </wpt>`;
-    });
-
-    gpx += `
-</gpx>`;
-
-    const blob = new Blob([gpx], { type: "application/gpx+xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  downloadBtn.addEventListener("click", downloadGPX);
-
-  // ======================
-  // Resize handle logic
-  // ======================
-  const tableContainer = document.getElementById("tableContainer");
-  const resizeHandle = document.getElementById("resizeHandle");
-
-  let startY, startHeight;
-
-  function initResize(e) {
-    startY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
-    startHeight = parseInt(window.getComputedStyle(tableContainer).height, 10);
-    document.addEventListener("mousemove", doResize);
-    document.addEventListener("mouseup", stopResize);
-    document.addEventListener("touchmove", doResize, { passive: false });
-    document.addEventListener("touchend", stopResize);
-  }
-
-  function doResize(e) {
-    const clientY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
-    const dy = startY - clientY; // drag up increases height
-    let newHeight = startHeight + dy;
-    if (newHeight < 100) newHeight = 100; // minimum
-    if (newHeight > 600) newHeight = 600; // maximum
-    tableContainer.style.maxHeight = newHeight + "px";
-    tableContainer.style.height = newHeight + "px";
-    e.preventDefault();
-  }
-
-  function stopResize() {
-    document.removeEventListener("mousemove", doResize);
-    document.removeEventListener("mouseup", stopResize);
-    document.removeEventListener("touchmove", doResize);
-    document.removeEventListener("touchend", stopResize);
-  }
-
-  resizeHandle.addEventListener("mousedown", initResize);
-  resizeHandle.addEventListener("touchstart", initResize, { passive: false });
-</script>
+    resizeHandle.addEventListener("mousedown", initResize);
+    resizeHandle.addEventListener("touchstart", initResize, { passive: false });
+  </script>
 </body>
 </html>
