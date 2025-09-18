@@ -120,8 +120,10 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     width: 240px;
     height: 100%;
     transform: translateX(220px); /* only handle visible */
-    box-shadow: -4px 0 12px rgba(0,0,0,0.3);
+    box-shadow: -4px 0 12px rgba(0,0,0,0.4);
+    background: #f9f9f9;
     padding: 10px;
+    z-index: 9999;  /* ensures sidebar floats above the map */
     transition: transform 0.2s ease;
   }
   #sidebar.dragging { transition: none; }
