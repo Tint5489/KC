@@ -148,7 +148,6 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     border-radius: 4px 0 0 4px;
     cursor: pointer;
     z-index: 10000;
-    transition: opacity 0.3s ease;
   }
 }
 </style>
@@ -191,25 +190,12 @@ const toggleBtn=document.getElementById("sidebarToggle");
 // Initially collapsed on mobile
 if(window.innerWidth < 820) sidebar.classList.add("collapsed");
 
-// Arrow toggle
+// Arrow toggle (always visible)
 toggleBtn.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
   toggleBtn.innerHTML = sidebar.classList.contains("collapsed") ? "&#x25B6;" : "&#x25C0;";
   setTimeout(()=>map.invalidateSize(),200);
 });
-
-// Auto-hide arrow after idle
-let arrowTimeout;
-function hideArrow() { toggleBtn.style.opacity='0'; toggleBtn.style.pointerEvents='none'; }
-function showArrow() { 
-  toggleBtn.style.opacity='1'; 
-  toggleBtn.style.pointerEvents='auto';
-  clearTimeout(arrowTimeout);
-  arrowTimeout=setTimeout(hideArrow,5000);
-}
-arrowTimeout = setTimeout(hideArrow,5000);
-document.addEventListener('mousemove', e=>{ if(e.clientX>window.innerWidth-40) showArrow(); });
-document.addEventListener('touchstart', e=>{ const touchX=e.touches[0].clientX; if(touchX>window.innerWidth-40) showArrow(); });
 
 // Handle GPX file
 document.getElementById("gpxFile").addEventListener("change", e=>{
