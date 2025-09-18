@@ -205,9 +205,9 @@ function showArrow() {
   toggleBtn.style.opacity='1'; 
   toggleBtn.style.pointerEvents='auto';
   clearTimeout(arrowTimeout);
-  arrowTimeout=setTimeout(hideArrow,2000);
+  arrowTimeout=setTimeout(hideArrow,5000);
 }
-arrowTimeout = setTimeout(hideArrow,2000);
+arrowTimeout = setTimeout(hideArrow,5000);
 document.addEventListener('mousemove', e=>{ if(e.clientX>window.innerWidth-40) showArrow(); });
 document.addEventListener('touchstart', e=>{ const touchX=e.touches[0].clientX; if(touchX>window.innerWidth-40) showArrow(); });
 
