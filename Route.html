@@ -1,85 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Stops Table with Resizer</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GPX Route Viewer — Resizable / Drag Handle</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
   <style>
+    :root { --sidebar-width: 340px; }
+
+    html,body { height: 100%; margin: 0; }
     body {
-      margin: 0;
       display: flex;
       height: 100vh;
-      font-family: Arial, sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
+      flex-direction: row;
+      overflow: hidden;
     }
+
+    /* Map */
     #map {
-      flex: 1;
+      flex: 3;
+      min-width: 0;
+      min-height: 200px;
     }
+
+    /* Sidebar */
     #sidebar {
-      width: 320px;
-      background: #f9f9f9;
+      flex: 1;
+      max-width: var(--sidebar-width);
+      width: var(--sidebar-width);
+      box-sizing: border-box;
       border-left: 1px solid #ccc;
+      background: #f9f9f9;
       display: flex;
       flex-direction: column;
       padding: 10px;
-      box-sizing: border-box;
+      gap: 8px;
+      overflow: hidden;
     }
+    #sidebar h2 { margin: 0 0 6px 0; font-size: 18px; }
+
+    /* Resize handle - larger touch target and hamburger lines */
     #resizeHandle {
-      height: 16px;
-      cursor: row-resize;
+      height: 26px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 6px 0;
-      touch-action: none;
+      cursor: row-resize;
+      touch-action: none; /* we'll manage touch */
+      user-select: none;
     }
-    /* Hamburger lines */
-    #resizeHandle div {
-      width: 24px;
-      height: 3px;
-      background: #888;
-      margin: 2px 0;
+    #resizeHandle .hamb {
+      display: inline-block;
+      width: 28px;
+      height: 16px;
+      position: relative;
+    }
+    #resizeHandle .hamb span {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #666;
       border-radius: 2px;
     }
+    #resizeHandle .hamb span:nth-child(1){ top: 0; }
+    #resizeHandle .hamb span:nth-child(2){ top: 7px; }
+    #resizeHandle .hamb span:nth-child(3){ bottom: 0; }
+
+    /* Table container */
     .table-container {
-      flex: 1;
+      width: 100%;
       overflow-y: auto;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      max-height: 250px; /* default */
-      height: 250px;
-      transition: height 0.1s ease-out;
+      -webkit-overflow-scrolling: touch;
+      background: #fff;
+      border-radius: 6px;
+      border: 2px solid #dadada;
+      box-shadow: 0 2px 8px -2px #bbb;
+      padding-bottom: 6px;
+      max-height: 360px;   /* adjustable by handle */
+      height: 320px;       /* starting height */
     }
+
+    /* Scrollbar cosmetic */
+    .table-container::-webkit-scrollbar { width: 10px; }
+    .table-container::-webkit-scrollbar-thumb { background: #007bff; border-radius: 8px; }
+
     table {
       width: 100%;
       border-collapse: collapse;
+      min-width: 260px;
+      background: white;
     }
     th, td {
-      border: 1px solid #ddd;
-      padding: 6px;
-      text-align: left;
+      padding: 8px 8px;
+      border: 1px solid #e6e6e6;
+      font-size: 15px;
     }
-    th {
-      background: #eee;
-    }
-    .handle-col {
-      width: 30px;
+
+    /* Columns */
+    th.handle-col, td.handle-col {
+      width: 40px;
+      text-align: center;
+      background: #f4f7fa;
       cursor: grab;
     }
-    .num-col {
-      width: 40px;
+    .drag-handle {
+      font-size: 18px;
+      user-select: none;
     }
+    th.num-col, td.num-col {
+      width: 1%;
+      text-align: right;
+      background: #fafcff;
+    }
+
+    /* mobile layout */
+    @media (max-width: 820px) {
+      body { flex-direction: column; }
+      #sidebar { width: 100%; max-width: none; border-left: none; border-top: 1px solid #ccc; padding: 10px; }
+      #map { height: 40vh; min-height: 180px; }
+      .table-container { max-height: 42vh; height: 40vh; }
+    }
+
+    /* keep download button at bottom */
+    #downloadGpxBtn {
+      margin-top: 8px;
+      padding: 12px;
+      font-size: 15px;
+      width: 100%;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+
+    .updated-row { background: #eaf7ff; transition: background 0.5s; }
   </style>
 </head>
 <body>
+
   <div id="map"></div>
+
   <div id="sidebar">
     <h2>Stops</h2>
-    <input type="file" id="gpxFile" accept=".gpx"><br><br>
 
-    <!-- Hamburger resize handle -->
-    <div id="resizeHandle">
-      <div></div>
-      <div></div>
-      <div></div>
+    <input id="gpxFile" type="file" accept=".gpx" />
+    <div id="resizeHandle" title="Drag to resize table (touch/mouse)">
+      <div class="hamb" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
     </div>
 
     <div class="table-container" id="tableContainer">
@@ -94,44 +165,228 @@
     <button id="downloadGpxBtn">Download Reordered GPX</button>
   </div>
 
+  <!-- libs (make sure they load before the app script) -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/togeojson"></script>
+  <script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
+
   <script>
-    // Table resize logic
+    // MAP init
+    const map = L.map('map', {tap: true}).setView([51.505, -0.09], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+    // ensure correct rendering on initial load
+    setTimeout(()=>map.invalidateSize(), 200);
+
+    // state
+    let stops = [];
+    let markers = [];
+    let sortable = null;
+
+    // DOM refs
+    const tbody = document.querySelector("#stopsTable tbody");
+    const downloadBtn = document.getElementById("downloadGpxBtn");
+    const fileInput = document.getElementById("gpxFile");
     const tableContainer = document.getElementById("tableContainer");
     const resizeHandle = document.getElementById("resizeHandle");
 
-    let startY, startHeight;
+    fileInput.addEventListener("change", handleFile);
+    downloadBtn.addEventListener("click", downloadGPX);
 
+    // GPX file reader + parser
+    function handleFile(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(evt.target.result, "application/xml");
+          if (xmlDoc.getElementsByTagName("parsererror").length) {
+            alert("Unable to parse GPX file (malformed XML).");
+            return;
+          }
+
+          const converter = (window.toGeoJSON || window.togeojson);
+          if (!converter || !converter.gpx) {
+            alert("GPX converter not loaded. Make sure togeojson is available.");
+            return;
+          }
+          const geojson = converter.gpx(xmlDoc);
+
+          if (!geojson || !Array.isArray(geojson.features)) {
+            alert("No features found in GPX file.");
+            return;
+          }
+
+          // extract waypoint Points
+          stops = geojson.features
+            .filter(f => f.geometry && f.geometry.type === "Point")
+            .map((f, i) => ({
+              name: (f.properties && (f.properties.name || f.properties.desc)) || `Stop ${i+1}`,
+              lat: f.geometry.coordinates[1],
+              lon: f.geometry.coordinates[0]
+            }));
+
+          if (stops.length === 0) {
+            alert("No waypoint points found in GPX (wpt).");
+          }
+
+          updateTable();
+          initSortable();
+          updateMarkers();
+        } catch (err) {
+          console.error(err);
+          alert("Error reading GPX: " + (err && err.message ? err.message : err));
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // build table rows
+    function updateTable() {
+      tbody.innerHTML = "";
+      stops.forEach((stop, i) => {
+        const row = document.createElement("tr");
+        row.dataset.index = i; // preserve original index for Sortable mapping
+        row.innerHTML = `
+          <td class="handle-col"><span class="drag-handle" aria-hidden="true">&#9776;</span></td>
+          <td class="num-col">${i+1}</td>
+          <td>${escapeHtml(stop.name)}</td>
+        `;
+        row.classList.add("updated-row");
+        tbody.appendChild(row);
+        // small flash for change recognition
+        setTimeout(()=>row.classList.remove("updated-row"), 450);
+      });
+    }
+
+    // update map markers and center
+    function updateMarkers() {
+      // clear existing
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      stops.forEach((stop, i) => {
+        const numberIcon = L.divIcon({
+          className: "numbered-marker",
+          html: `<div style="background:#007bff;color:#fff;border-radius:50%;width:26px;height:26px;line-height:26px;text-align:center;font-weight:600;border:2px solid #fff">${i+1}</div>`,
+          iconSize: [30,30],
+          iconAnchor: [15,30]
+        });
+        const marker = L.marker([stop.lat, stop.lon], { icon: numberIcon })
+          .addTo(map)
+          .bindTooltip(`${i+1}. ${stop.name}`, {
+            permanent: true, direction: "top", offset: [0,-35], className: "stop-label"
+          });
+        markers.push(marker);
+      });
+
+      if (markers.length) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [40,40] });
+      }
+      // re-render tiles / layout after markers/fit
+      setTimeout(()=>map.invalidateSize(), 200);
+    }
+
+    // Sortable: only drag by handle
+    function initSortable() {
+      if (sortable) sortable.destroy();
+      sortable = Sortable.create(tbody, {
+        animation: 150,
+        handle: ".drag-handle",
+        ghostClass: 'sortable-ghost',
+        onEnd(evt) {
+          // build new order by reading rows in DOM order and mapping original indices
+          const newStops = [];
+          tbody.querySelectorAll("tr").forEach(row => {
+            const oldIndex = parseInt(row.dataset.index, 10);
+            if (!Number.isNaN(oldIndex) && stops[oldIndex]) newStops.push(stops[oldIndex]);
+          });
+          stops = newStops;
+          updateTable();
+          updateMarkers();
+          initSortable(); // rebind (dataset indices reset)
+        }
+      });
+    }
+
+    // download GPX in reordered form
+    function downloadGPX() {
+      if (!stops || stops.length === 0) { alert("No stops to export."); return; }
+      const now = new Date();
+      const filename = `Stops-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.gpx`;
+
+      let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+  <gpx version="1.1" creator="GPXRouteViewer" xmlns="http://www.topografix.com/GPX/1/1">`;
+      stops.forEach((s, i) => {
+        gpx += `
+    <wpt lat="${s.lat}" lon="${s.lon}">
+      <name>${escapeXml(i+1 + ". " + s.name)}</name>
+    </wpt>`;
+      });
+      gpx += `
+  </gpx>`;
+
+      const blob = new Blob([gpx], { type: "application/gpx+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Resize handle logic (mouse + touch). Adjusts table container height.
+    let startY = 0, startHeight = 0, resizing = false;
     function initResize(e) {
+      resizing = true;
       startY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
       startHeight = parseInt(window.getComputedStyle(tableContainer).height, 10);
       document.addEventListener("mousemove", doResize);
       document.addEventListener("mouseup", stopResize);
       document.addEventListener("touchmove", doResize, { passive: false });
       document.addEventListener("touchend", stopResize);
-      e.preventDefault();
+      e.preventDefault && e.preventDefault();
     }
-
     function doResize(e) {
+      if (!resizing) return;
       const clientY = e.type.includes("touch") ? e.touches[0].clientY : e.clientY;
-      const dy = startY - clientY;
+      const dy = startY - clientY; // dragging up increases height
       let newHeight = startHeight + dy;
-      // clamp to min/max
-      if (newHeight < 100) newHeight = 100;
-      if (newHeight > 600) newHeight = 600;
-      tableContainer.style.maxHeight = newHeight + "px";
+      newHeight = Math.max(110, Math.min(740, newHeight)); // clamp
       tableContainer.style.height = newHeight + "px";
-      e.preventDefault();
+      tableContainer.style.maxHeight = newHeight + "px";
+      e.preventDefault && e.preventDefault();
     }
-
     function stopResize() {
+      if (!resizing) return;
+      resizing = false;
       document.removeEventListener("mousemove", doResize);
       document.removeEventListener("mouseup", stopResize);
       document.removeEventListener("touchmove", doResize);
       document.removeEventListener("touchend", stopResize);
+      // allow layout to settle and then redraw map
+      setTimeout(()=>map.invalidateSize(), 120);
     }
 
     resizeHandle.addEventListener("mousedown", initResize);
     resizeHandle.addEventListener("touchstart", initResize, { passive: false });
+
+    // helper: escape HTML in table cell
+    function escapeHtml(str) {
+      if (!str && str !== 0) return '';
+      return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+    function escapeXml(s) {
+      return escapeHtml(s).replace(/\n/g, '&#10;');
+    }
+
+    // If the window resizes (orientation), ensure map redraws
+    window.addEventListener('resize', () => setTimeout(()=>map.invalidateSize(), 150));
   </script>
 </body>
 </html>
