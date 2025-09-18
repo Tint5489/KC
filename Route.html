@@ -177,7 +177,7 @@ const map=L.map('map').setView([51.505,-0.09],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
 // Variables
-let stops=[],markers=[],sortable=null;
+let stops=[],markers=[],sortable=null, routeLine=null;
 const tbody=document.querySelector("#stopsTable tbody");
 const tableContainer=document.getElementById("tableContainer");
 const resizeHandle=document.getElementById("resizeHandle");
@@ -230,7 +230,7 @@ document.getElementById("gpxFile").addEventListener("change", e=>{
       lat:f.geometry.coordinates[1],
       lon:f.geometry.coordinates[0]
     }));
-    updateTable(); initSortable(); updateMarkers();
+    updateTable(); initSortable(); updateMarkers(); updateRoute();
   }
   reader.readAsText(file);
 });
@@ -239,7 +239,17 @@ document.getElementById("gpxFile").addEventListener("change", e=>{
 function updateTable(){tbody.innerHTML=""; stops.forEach((stop,i)=>{const row=document.createElement("tr"); row.dataset.index=i; row.innerHTML=`<td>${i+1}</td><td>${stop.name}</td>`; row.classList.add("updated-row"); tbody.appendChild(row); setTimeout(()=>row.classList.remove("updated-row"),500);});}
 
 // Map markers
-function updateMarkers(){markers.forEach(m=>map.removeLayer(m)); markers=[]; stops.forEach((stop,i)=>{const icon=L.divIcon({className:"numbered-marker", html:`<div>${i+1}</div>`, iconSize:[30,30], iconAnchor:[15,30]}); const marker=L.marker([stop.lat,stop.lon],{icon}).addTo(map).bindTooltip(`${i+1}. ${stop.name}`,{permanent:true,direction:"top",offset:[0,-35]}); markers.push(marker);}); if(markers.length){const group=L.featureGroup(markers); map.fitBounds(group.getBounds(),{padding:[40,40]});}}
+function updateMarkers(){markers.forEach(m=>map.removeLayer(m)); markers=[]; stops.forEach((stop,i)=>{const icon=L.divIcon({className:"numbered-marker", html:`<div>${i+1}</div>`, iconSize:[30,30], iconAnchor:[15,30]}); const marker=L.marker([stop.lat,stop.lon],{icon}).addTo(map).bindTooltip(`${i+1}. ${stop.name}`,{permanent:true,direction:"top",offset:[0,-35]}); markers.push(marker);}); updateRoute(); }
+
+// Draw polyline route
+function updateRoute() {
+  if (routeLine) map.removeLayer(routeLine);
+  if (stops.length<2) return;
+  const latlngs=stops.map(s=>[s.lat,s.lon]);
+  routeLine=L.polyline(latlngs,{color:'blue',weight:4,opacity:0.7}).addTo(map);
+  const group=L.featureGroup([...markers, routeLine]);
+  map.fitBounds(group.getBounds(),{padding:[40,40]});
+}
 
 // Sortable
 function initSortable(){if(sortable)sortable.destroy(); sortable=Sortable.create(tbody,{animation:150, handle:"td:first-child", onEnd:()=>{const newStops=[]; tbody.querySelectorAll("tr").forEach(row=>{const oldIndex=parseInt(row.dataset.index,10); newStops.push(stops[oldIndex]);}); stops=newStops; updateTable(); updateMarkers(); initSortable();}});}
