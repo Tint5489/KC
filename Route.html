@@ -119,13 +119,14 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     right: 0;
     width: 240px;
     height: 100%;
-    transform: translateX(220px); /* only handle visible */
+    transform: translateX(0); /* fully visible initially */
     box-shadow: -4px 0 12px rgba(0,0,0,0.4);
     background: #f9f9f9;
     padding: 10px;
-    z-index: 9999;  /* ensures sidebar floats above the map */
+    z-index: 9999;  
     transition: transform 0.2s ease;
   }
+  #sidebar.collapsed { transform: translateX(200px); } /* collapsed offscreen */
   #sidebar.dragging { transition: none; }
   #sidebar #dragHandle {
     position: absolute;
@@ -136,6 +137,26 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     cursor: grab;
     background: rgba(0,0,0,0.1);
   }
+
+  /* Arrow toggle button */
+  #sidebarToggle {
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 50px;
+    background: #007bff;
+    color: white;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px 0 0 4px;
+    cursor: pointer;
+    z-index: 10000;
+  }
+  #sidebar.collapsed #sidebarToggle { left: 0; }
 }
 </style>
 </head>
@@ -169,6 +190,26 @@ const resizeHandle=document.getElementById("resizeHandle");
 const dragHandle=document.getElementById("dragHandle");
 const sidebar=document.getElementById("sidebar");
 const downloadBtn=document.getElementById("downloadGpxBtn");
+
+// Arrow button
+const toggleBtn = document.createElement("div");
+toggleBtn.id = "sidebarToggle";
+toggleBtn.innerHTML = "&#x25C0;"; // left arrow
+sidebar.appendChild(toggleBtn);
+
+toggleBtn.addEventListener("click", () => {
+  if(sidebar.classList.contains("collapsed")) {
+    sidebar.classList.remove("collapsed");
+    toggleBtn.innerHTML = "&#x25C0;";
+  } else {
+    sidebar.classList.add("collapsed");
+    toggleBtn.innerHTML = "&#x25B6;";
+  }
+  setTimeout(()=>map.invalidateSize(), 200);
+});
+
+// Initially collapsed on mobile
+if(window.innerWidth < 820) sidebar.classList.add("collapsed");
 
 // Handle GPX file
 document.getElementById("gpxFile").addEventListener("change", e=>{
@@ -230,8 +271,8 @@ document.addEventListener("pointerup", e=>{
   if(!dragging) return;
   dragging=false; sidebar.classList.remove("dragging");
   let style=getComputedStyle(sidebar); let tx=parseFloat(style.transform.split(",")[4]||style.transform.split("(")[1]);
-  if(tx>110) sidebar.style.transform=`translateX(220px)`; // close
-  else sidebar.style.transform=`translateX(0px)`;       // open
+  if(tx>110) sidebar.style.transform=`translateX(200px)`; // snap collapsed
+  else sidebar.style.transform=`translateX(0px)`;       // snap open
   setTimeout(()=>map.invalidateSize(),200);
 });
 </script>
