@@ -133,8 +133,8 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
 
   /* Arrow toggle button */
   #sidebarToggle {
-    position: absolute;
-    left: -30px;
+    position: fixed; /* fixed so it stays visible */
+    right: 0;        
     top: 50%;
     transform: translateY(-50%);
     width: 30px;
@@ -150,12 +150,14 @@ body.collapsed th:nth-child(2), body.collapsed td:nth-child(2) { display: none; 
     z-index: 10000;
     transition: opacity 0.3s ease;
   }
-  #sidebar.collapsed #sidebarToggle { left: -30px; }
 }
 </style>
 </head>
 <body>
 <div id="map"></div>
+
+<!-- Toggle button outside sidebar -->
+<div id="sidebarToggle">&#x25C0;</div>
 
 <div id="sidebar">
   <div id="dragHandle"></div>
@@ -184,22 +186,16 @@ const resizeHandle=document.getElementById("resizeHandle");
 const dragHandle=document.getElementById("dragHandle");
 const sidebar=document.getElementById("sidebar");
 const downloadBtn=document.getElementById("downloadGpxBtn");
+const toggleBtn=document.getElementById("sidebarToggle");
 
-// Arrow button
-const toggleBtn = document.createElement("div");
-toggleBtn.id = "sidebarToggle";
-toggleBtn.innerHTML = "&#x25C0;"; // left arrow
-sidebar.appendChild(toggleBtn);
+// Initially collapsed on mobile
+if(window.innerWidth < 820) sidebar.classList.add("collapsed");
 
+// Arrow toggle
 toggleBtn.addEventListener("click", () => {
-  if(sidebar.classList.contains("collapsed")) {
-    sidebar.classList.remove("collapsed");
-    toggleBtn.innerHTML = "&#x25C0;";
-  } else {
-    sidebar.classList.add("collapsed");
-    toggleBtn.innerHTML = "&#x25B6;";
-  }
-  setTimeout(()=>map.invalidateSize(), 200);
+  sidebar.classList.toggle("collapsed");
+  toggleBtn.innerHTML = sidebar.classList.contains("collapsed") ? "&#x25B6;" : "&#x25C0;";
+  setTimeout(()=>map.invalidateSize(),200);
 });
 
 // Auto-hide arrow after idle
@@ -209,14 +205,11 @@ function showArrow() {
   toggleBtn.style.opacity='1'; 
   toggleBtn.style.pointerEvents='auto';
   clearTimeout(arrowTimeout);
-  arrowTimeout = setTimeout(hideArrow, 2000);
+  arrowTimeout=setTimeout(hideArrow,2000);
 }
-arrowTimeout = setTimeout(hideArrow, 2000);
+arrowTimeout = setTimeout(hideArrow,2000);
 document.addEventListener('mousemove', e=>{ if(e.clientX>window.innerWidth-40) showArrow(); });
 document.addEventListener('touchstart', e=>{ const touchX=e.touches[0].clientX; if(touchX>window.innerWidth-40) showArrow(); });
-
-// Initially collapsed on mobile
-if(window.innerWidth < 820) sidebar.classList.add("collapsed");
 
 // Handle GPX file
 document.getElementById("gpxFile").addEventListener("change", e=>{
@@ -230,24 +223,32 @@ document.getElementById("gpxFile").addEventListener("change", e=>{
       lat:f.geometry.coordinates[1],
       lon:f.geometry.coordinates[0]
     }));
-    updateTable(); initSortable(); updateMarkers(); updateRoute();
+    updateTable(); initSortable(); updateMarkers();
   }
   reader.readAsText(file);
 });
 
 // Table update
-function updateTable(){tbody.innerHTML=""; stops.forEach((stop,i)=>{const row=document.createElement("tr"); row.dataset.index=i; row.innerHTML=`<td>${i+1}</td><td>${stop.name}</td>`; row.classList.add("updated-row"); tbody.appendChild(row); setTimeout(()=>row.classList.remove("updated-row"),500);});}
+function updateTable(){tbody.innerHTML=""; stops.forEach((stop,i)=>{const row=document.createElement("tr"); row.dataset.index=i; row.innerHTML=`<td>${i+1}</td><td>${stop.name}</td>`; tbody.appendChild(row);});}
 
 // Map markers
-function updateMarkers(){markers.forEach(m=>map.removeLayer(m)); markers=[]; stops.forEach((stop,i)=>{const icon=L.divIcon({className:"numbered-marker", html:`<div>${i+1}</div>`, iconSize:[30,30], iconAnchor:[15,30]}); const marker=L.marker([stop.lat,stop.lon],{icon}).addTo(map).bindTooltip(`${i+1}. ${stop.name}`,{permanent:true,direction:"top",offset:[0,-35]}); markers.push(marker);}); updateRoute(); }
+function updateMarkers(){
+  markers.forEach(m=>map.removeLayer(m)); markers=[];
+  stops.forEach((stop,i)=>{
+    const icon=L.divIcon({className:"numbered-marker", html:`<div>${i+1}</div>`, iconSize:[30,30], iconAnchor:[15,30]});
+    const marker=L.marker([stop.lat,stop.lon],{icon}).addTo(map).bindTooltip(`${i+1}. ${stop.name}`,{permanent:true,direction:"top",offset:[0,-35]});
+    markers.push(marker);
+  });
+  updateRoute();
+}
 
 // Draw polyline route
 function updateRoute() {
-  if (routeLine) map.removeLayer(routeLine);
-  if (stops.length<2) return;
+  if(routeLine) map.removeLayer(routeLine);
+  if(stops.length<2) return;
   const latlngs=stops.map(s=>[s.lat,s.lon]);
   routeLine=L.polyline(latlngs,{color:'blue',weight:4,opacity:0.7}).addTo(map);
-  const group=L.featureGroup([...markers, routeLine]);
+  const group=L.featureGroup([...markers,routeLine]);
   map.fitBounds(group.getBounds(),{padding:[40,40]});
 }
 
