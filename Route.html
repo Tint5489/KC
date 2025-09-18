@@ -48,24 +48,33 @@
 
   /* Collapse state */
   body.collapsed #sidebar {
-    width: 60px;
-    min-width: 60px;
+    width: auto;           /* auto fit content */
+    min-width: 0;
     padding: 0;
-    overflow: visible;
   }
-  body.collapsed #sidebar h2,
-  body.collapsed #sidebar input,
-  body.collapsed #resizeHandle,
-  body.collapsed #downloadGpxBtn,
-  body.collapsed th:nth-child(2),
-  body.collapsed td:nth-child(2) {
-    display: none;
-  }
+
   body.collapsed .table-container {
-    height: auto !important;
     max-height: none !important;
     border: none;
     box-shadow: none;
+    overflow: hidden;
+  }
+
+  body.collapsed table {
+    width: auto !important;  /* shrink table to content */
+  }
+
+  body.collapsed th:first-child,
+  body.collapsed td:first-child {
+    display: table-cell;
+    width: auto;
+    padding: 6px;
+    text-align: center;
+  }
+
+  body.collapsed th:nth-child(2),
+  body.collapsed td:nth-child(2) {
+    display: none;           /* hide Name column */
   }
 
   /* Resize handle */
@@ -261,7 +270,7 @@ function initSortable(){
   if(sortable) sortable.destroy();
   sortable = Sortable.create(tbody,{
     animation:150,
-    handle:"td:first-child", // drag only from number column
+    handle:"td:first-child",
     onEnd: function(){
       const newStops = [];
       tbody.querySelectorAll("tr").forEach(row=>{
@@ -289,7 +298,7 @@ downloadBtn.addEventListener("click", ()=>{
   document.body.removeChild(a); URL.revokeObjectURL(url);
 });
 
-// Pointer Events resize
+// Resize table
 let startY=0, startHeight=0, resizing=false;
 function initResize(e){ resizing=true; startY=e.clientY; startHeight=parseInt(window.getComputedStyle(tableContainer).height,10);
   document.addEventListener("pointermove", doResize); document.addEventListener("pointerup", stopResize); e.preventDefault();
