@@ -23,10 +23,11 @@
     min-width: 240px;
   }
   #sidebar h2 { margin-top: 0; }
+
   .table-container {
     width: 100%;
     overflow-x: auto;
-    overflow-y: scroll !important;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     max-height: 400px;
     background: white;
@@ -36,31 +37,25 @@
     box-shadow: 0 2px 8px -2px #bbb;
     padding-bottom: 10px;
     touch-action: auto;
-    scrollbar-width: thick;           /* Firefox */
-    scrollbar-color: #007bff #e3e3e3; /* Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: #007bff #e3e3e3;
   }
-  /* Chrome, Edge, Safari */
+
+  /* Custom scrollbars (desktop) */
   .table-container::-webkit-scrollbar {
-    width: 16px;
-    background: #e3e3e3;
-    border-radius: 8px;
+    width: 10px;
   }
   .table-container::-webkit-scrollbar-thumb {
     background: #007bff;
     border-radius: 8px;
-    border: 4px solid #e3e3e3;
   }
-  .table-container::-webkit-scrollbar-track {
-    background: #e3e3e3;
-    border-radius: 8px;
-  }
+
   table {
     width: 100%;
     border-collapse: collapse;
     font-size: 16px;
-    min-width: 260px;
+    min-width: 280px;
     background: white;
-    /* Let columns size dynamically */
   }
   th, td {
     padding: 10px 8px;
@@ -69,22 +64,26 @@
     font-size: 15px;
     background: white;
   }
-  th:first-child, td:first-child {
-    position: sticky;
-    left: 0;
+
+  /* Drag handle column */
+  th.handle-col, td.handle-col {
+    width: 32px;
+    text-align: center;
+    cursor: grab;
     background: #f4f7fa;
-    z-index: 2;
-    box-shadow: 2px 0 8px -2px #bbb;
+  }
+  .drag-handle {
+    font-size: 20px;
+    cursor: grab;
+    user-select: none;
+  }
+
+  th.num-col, td.num-col {
     width: 1%;
-    white-space: nowrap;
     text-align: right;
+    background: #f4f7fa;
   }
-  th:nth-child(2), td:nth-child(2) {
-    width: auto;
-    white-space: nowrap;
-    text-align: left;
-  }
-  tr { cursor: grab; }
+
   .numbered-marker div {
     background: #007bff;
     color: white;
@@ -116,57 +115,13 @@
     background: #e3f7ff;
     transition: background 0.5s;
   }
-  /* Responsive styles */
+
+  /* Responsive */
   @media (max-width: 800px) {
-    body {
-      flex-direction: column;
-    }
-    #sidebar {
-      min-width: 0;
-      width: 100vw;
-      border-left: none;
-      border-top: 1px solid #ccc;
-      padding: 14px 8px;
-    }
-    #map {
-      flex: 2;
-      min-height: 300px;
-      height: 40vh;
-    }
-    .table-container {
-      margin-bottom: 8px;
-      max-height: 340px;
-    }
-    th, td {
-      padding: 12px 6px;
-      font-size: 16px;
-    }
-  }
-  @media (max-width: 600px) {
-    table {
-      min-width: 300px;
-    }
-    th, td {
-      font-size: 14px;
-    }
-    .table-container {
-      max-height: 220px;
-    }
-  }
-  @media (max-width: 500px) {
-    table, th, td {
-      font-size: 14px;
-    }
-    button {
-      font-size: 15px;
-      padding: 10px;
-    }
-    #sidebar h2 {
-      font-size: 18px;
-    }
-    .table-container {
-      max-height: 160px;
-    }
+    body { flex-direction: column; }
+    #sidebar { width: 100vw; border-left: none; border-top: 1px solid #ccc; }
+    #map { flex: 2; min-height: 300px; height: 40vh; }
+    .table-container { max-height: 340px; }
   }
 </style>
 </head>
@@ -178,7 +133,7 @@
   <div class="table-container">
     <table id="stopsTable">
       <thead>
-        <tr><th>#</th><th>Name</th></tr>
+        <tr><th class="handle-col"></th><th class="num-col">#</th><th>Name</th></tr>
       </thead>
       <tbody></tbody>
     </table>
@@ -231,7 +186,10 @@
     stops.forEach((stop, i) => {
       const row = document.createElement("tr");
       row.dataset.index = i;
-      row.innerHTML = `<td>${i+1}</td><td>${stop.name}</td>`;
+      row.innerHTML = `
+        <td class="handle-col"><span class="drag-handle">&#9776;</span></td>
+        <td class="num-col">${i+1}</td>
+        <td>${stop.name}</td>`;
       row.classList.add("updated-row");
       tbody.appendChild(row);
       setTimeout(() => row.classList.remove("updated-row"), 500);
@@ -268,6 +226,7 @@
     if (sortable) sortable.destroy();
     sortable = Sortable.create(tbody, {
       animation: 150,
+      handle: ".drag-handle", // only drag via hamburger
       onEnd: function() {
         const newStops = [];
         tbody.querySelectorAll("tr").forEach(row => {
