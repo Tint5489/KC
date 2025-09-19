@@ -9,19 +9,13 @@
 <style>
   body { margin:0; padding:0; display:flex; height:100vh; font-family: Arial,sans-serif; }
   #map { flex:1; height:100%; }
-  #controls {
-    width: 300px;
-    overflow-y: auto;
-    border-left:1px solid #ccc;
-    padding:10px;
-    background:#f9f9f9;
-  }
-  table { width:100%; border-collapse: collapse; margin-top:10px; }
-  th,td { border:1px solid #ddd; padding:8px; }
+  #controls { width: 300px; overflow-y:auto; border-left:1px solid #ccc; padding:10px; background:#f9f9f9; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { border:1px solid #ddd; padding:8px; }
   th { background:#f4f4f4; }
-  .handle { cursor: grab; }
-  tr.dragging { background: #ffeeba; }
-  button { margin-top:10px; padding:8px; width:100%; font-size:14px; }
+  tr.dragging { background:#ffeeba; }
+  .handle { cursor:grab; }
+  button { margin-top:10px; padding:6px 10px; }
 </style>
 </head>
 <body>
@@ -53,21 +47,23 @@
 
 <script>
 const WORK_STOP = { name:"BlendBetter", lat:54.971723, lon:-2.949500 };
-let map = L.map('map').setView([54.58303, -2.56954], 6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
+let map = L.map('map').setView([54.58303,-2.56954],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
 
 let stops = [WORK_STOP, WORK_STOP];
 let markers = [];
 let routingControl = null;
 let sortable = null;
+
 const tbody = document.querySelector("#stopsTable tbody");
+const routeTypeSelect = document.getElementById("routeType");
 
 function updateTable() {
   tbody.innerHTML = "";
   stops.forEach((stop,i)=>{
     const row = document.createElement("tr");
-    row.dataset.index=i;
-    let handle = (i===0 || i===stops.length-1) ? "" : "&#9776;";
+    row.dataset.index = i;
+    let handle = (i===0||i===stops.length-1) ? "" : "&#9776;";
     row.innerHTML = `<td class="handle">${handle}</td><td>${stop.name}</td>`;
     tbody.appendChild(row);
   });
@@ -76,7 +72,7 @@ function updateTable() {
 function updateMarkers() {
   markers.forEach(m=>map.removeLayer(m));
   markers = stops.map((s,i)=>{
-    return L.marker([s.lat,s.lon]).addTo(map).bindTooltip(`${i+1}. ${s.name}`, { permanent:true });
+    return L.marker([s.lat,s.lon]).addTo(map).bindTooltip(`${i+1}. ${s.name}`,{permanent:true});
   });
   updateRoute();
 }
@@ -85,10 +81,11 @@ function updateRoute() {
   if(routingControl){ map.removeControl(routingControl); routingControl=null; }
   if(stops.length<2){ if(markers.length===1) map.setView(markers[0].getLatLng(),14); return; }
   const waypoints = stops.map(s=>L.latLng(s.lat,s.lon));
-  const routeType = document.getElementById("routeType").value;
+  const routeType = routeTypeSelect.value;
+
   routingControl = L.Routing.control({
     waypoints: waypoints,
-    lineOptions: { styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
+    lineOptions:{ styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
     addWaypoints:false,
     draggableWaypoints:false,
     fitSelectedRoutes:true,
@@ -108,43 +105,47 @@ function initSortable(){
     animation:160,
     filter:'tr:first-child, tr:last-child',
     onEnd:function(){
-      const newStops=[];
-      tbody.querySelectorAll('tr').forEach(row=>{ const oldIndex=parseInt(row.dataset.index,10); newStops.push(stops[oldIndex]); });
-      stops=[WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
-      updateTable(); updateMarkers(); initSortable();
+      const newStops = [];
+      tbody.querySelectorAll('tr').forEach(row=>{
+        const oldIndex = parseInt(row.dataset.index,10);
+        newStops.push(stops[oldIndex]);
+      });
+      stops = [WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
+      updateTable();
+      updateMarkers();
+      initSortable();
     }
   });
 }
 
-// Load GPX
 document.getElementById("fileInput").addEventListener("change", async ev=>{
-  const f=ev.target.files && ev.target.files[0]; if(!f) return;
-  const text=await f.text();
-  const xml=(new DOMParser()).parseFromString(text,'text/xml');
+  const f = ev.target.files && ev.target.files[0];
+  if(!f) return;
+  const text = await f.text();
+  const xml = (new DOMParser()).parseFromString(text,"text/xml");
   const geojson = toGeoJSON.gpx(xml);
-  const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==='Point');
-  const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||`Stop`, lat:ft.geometry.coordinates[1], lon:ft.geometry.coordinates[0] }));
-  stops=[WORK_STOP, ...userStops, WORK_STOP];
+  const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
+  const userStops = pts.map(ft=>({name:ft.properties.name||ft.properties.desc||"Stop", lat:ft.geometry.coordinates[1], lon:ft.geometry.coordinates[0]}));
+  stops = [WORK_STOP, ...userStops, WORK_STOP];
   updateTable(); initSortable(); updateMarkers();
 });
 
-// Optimize route button
-document.getElementById("optimizeBtn").addEventListener("click", optimizeStops);
-
 async function optimizeStops() {
-  if(stops.length<=2) return; // nothing to optimize
-  const intermediates=stops.slice(1,-1);
+  const intermediates = stops.slice(1,-1);
+  if(intermediates.length<2){ alert("Not enough stops to optimize."); return; }
+
   const coords = intermediates.map(s=>`${s.lon},${s.lat}`).join(";");
   const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
-  try {
+
+  try{
     const res = await fetch(url);
     const data = await res.json();
-    if(data.code==="Ok"){
+    if(data.code==="Ok" && data.trips && data.trips[0] && data.trips[0].waypoint_order){
       const optimized = data.trips[0].waypoint_order.map(i=>intermediates[i]);
-      stops=[WORK_STOP, ...optimized, WORK_STOP];
+      stops = [WORK_STOP, ...optimized, WORK_STOP];
       updateTable(); updateMarkers(); initSortable();
     } else {
-      alert("Optimization failed: "+data.message);
+      alert("Optimization failed or returned no waypoints.");
     }
   } catch(err){
     console.error(err);
@@ -152,11 +153,12 @@ async function optimizeStops() {
   }
 }
 
-// Route type change
-document.getElementById("routeType").addEventListener("change", updateRoute);
+document.getElementById("optimizeBtn").addEventListener("click", optimizeStops);
+routeTypeSelect.addEventListener("change", updateRoute);
 
-// Init
+// Initialize
 updateTable(); initSortable(); updateMarkers();
 </script>
+
 </body>
 </html>
