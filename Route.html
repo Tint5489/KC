@@ -56,6 +56,7 @@
 
   <button id="optimizeBtn" aria-label="Optimize Route">Optimize Route</button>
   <span id="loading" role="status">Loading...</span>
+
   <table id="stopsTable" aria-label="Stops list">
     <thead>
       <tr><th aria-label="Drag handle"></th><th>Stop</th></tr>
@@ -98,7 +99,6 @@ function updateTable() {
   stops.forEach((stop, i) => {
     const row = document.createElement("tr");
     row.dataset.index = i;
-    // Only allow drag handles for intermediates
     let handle = (i===0||i===stops.length-1) ? "" : "&#9776;";
     row.innerHTML = `<td class="handle" title="Drag to reorder">${handle}</td><td>${stop.name}</td>`;
     tbody.appendChild(row);
@@ -197,26 +197,32 @@ async function optimizeStops() {
     alert("Not enough stops to optimize (need at least 2 intermediates).");
     return;
   }
+
   loadingEl.textContent = "Optimizing route...";
   loadingEl.style.display = 'inline';
-  const coords = intermediates.map(s => `${s.lon},${s.lat}`).join(";");
+
+  const coords = stops.map(s => `${s.lon},${s.lat}`).join(";");
   const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
 
-  try{
+  try {
     const res = await fetch(url);
     if(!res.ok) throw new Error(`Network error (${res.status})`);
     const data = await res.json();
+
     if(data.code==="Ok" && data.trips && data.trips[0] && data.trips[0].waypoint_order){
-      const optimized = data.trips[0].waypoint_order.map(i=>intermediates[i]);
-      stops = [WORK_STOP, ...optimized, WORK_STOP];
-      updateTable(); updateMarkers(); initSortable();
+      const order = data.trips[0].waypoint_order;
+      const newStops = order.map(idx => stops[idx]);
+      stops = [WORK_STOP, ...newStops.filter(s => s !== WORK_STOP && s !== stops[stops.length-1]), WORK_STOP];
+      updateTable();
+      updateMarkers();
+      initSortable();
     } else {
       alert("Optimization failed or returned no waypoints.");
     }
   } catch(err){
     console.error(err);
     alert("Error optimizing route: " + err.message);
-  } finally{
+  } finally {
     loadingEl.style.display = 'none';
   }
 }
