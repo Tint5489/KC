@@ -22,10 +22,10 @@
   #controls label { font-weight:500; margin-bottom:4px; display:block; }
   #controls input[type="file"] { margin-bottom:8px; }
   table { width:100%; border-collapse:collapse; margin-top:10px; }
-  th, td { border:1px solid #ddd; padding:8px; }
+  th, td { border:1px solid #ddd; padding:8px; text-align:center; }
   th { background:#f4f4f4; font-weight:600; }
   tr.dragging { background:#ffeeba; }
-  .handle { cursor:grab; }
+  .handle { cursor:grab; font-weight:bold; }
   @media (max-width:700px){
     #controls { width:100vw; max-width:none; min-width:0; border-left:none; border-top:1px solid #ccc; }
     body { flex-direction:column; }
@@ -43,7 +43,7 @@
 
   <table id="stopsTable" aria-label="Stops list">
     <thead>
-      <tr><th aria-label="Drag handle"></th><th>Stop</th></tr>
+      <tr><th>#</th><th>Stop</th></tr>
     </thead>
     <tbody></tbody>
   </table>
@@ -79,9 +79,9 @@ function updateTable() {
   stops.forEach((stop, i) => {
     const row = document.createElement("tr");
     row.dataset.index = i;
-    // Only allow drag handles for intermediates
-    const handle = (i===0||i===stops.length-1) ? "" : "&#9776;";
-    row.innerHTML = `<td class="handle" title="Drag to reorder">${handle}</td><td>${stop.name}</td>`;
+    // Show stop number instead of hamburger
+    const handle = i + 1;
+    row.innerHTML = `<td class="handle" title="Stop number">${handle}</td><td>${stop.name}</td>`;
     tbody.appendChild(row);
   });
 }
