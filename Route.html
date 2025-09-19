@@ -1,207 +1,162 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Route Planner with Fixed Start & End</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      display: flex;
-      height: 100vh;
-      font-family: Arial, sans-serif;
-    }
-    #map {
-      flex: 1;
-      height: 100%;
-    }
-    #controls {
-      width: 300px;
-      overflow-y: auto;
-      border-left: 1px solid #ccc;
-      padding: 10px;
-      background: #f9f9f9;
-    }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; }
-    th { background: #f4f4f4; }
-    tr.dragging { background: #ffeeba; }
-    .handle { cursor: grab; }
-    button { margin-top:10px; padding:8px 12px; font-size:14px; cursor:pointer; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Route Planner with Fixed Start & End</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+<style>
+  body { margin:0; padding:0; display:flex; height:100vh; font-family: Arial,sans-serif; }
+  #map { flex:1; height:100%; }
+  #controls {
+    width: 300px;
+    overflow-y: auto;
+    border-left:1px solid #ccc;
+    padding:10px;
+    background:#f9f9f9;
+  }
+  table { width:100%; border-collapse: collapse; margin-top:10px; }
+  th,td { border:1px solid #ddd; padding:8px; }
+  th { background:#f4f4f4; }
+  .handle { cursor: grab; }
+  tr.dragging { background: #ffeeba; }
+  button { margin-top:10px; padding:8px; width:100%; font-size:14px; }
+</style>
 </head>
 <body>
-  <div id="map"></div>
 
-  <div id="controls">
-    <input type="file" id="fileInput" accept=".gpx"/>
-    <div style="margin:10px 0;">
-      <label for="routeType">Route type: </label>
-      <select id="routeType">
-        <option value="fastest" selected>Fastest</option>
-        <option value="shortest">Shortest</option>
-      </select>
-    </div>
-    <button id="optimizeBtn">Optimize Fastest Route</button>
-    <table id="stopsTable">
-      <thead>
-        <tr><th></th><th>Stop</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+<div id="map"></div>
+
+<div id="controls">
+  <input type="file" id="fileInput" accept=".gpx"/>
+  <div style="margin:10px 0;">
+    <label for="routeType">Route type: </label>
+    <select id="routeType">
+      <option value="fastest" selected>Fastest</option>
+      <option value="shortest">Shortest</option>
+    </select>
   </div>
+  <button id="optimizeBtn">Optimize Route</button>
+  <table id="stopsTable">
+    <thead>
+      <tr><th></th><th>Stop</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-  <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
 
-  <script>
-    // Fixed start & end
-    const WORK_STOP = {
-      name: "BlendBetter",
-      lat: 54.971723,
-      lon: -2.949500
-    };
+<script>
+const WORK_STOP = { name:"BlendBetter", lat:54.971723, lon:-2.949500 };
+let map = L.map('map').setView([54.58303, -2.56954], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
 
-    let map = L.map('map').setView([54.971723, -2.949500], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+let stops = [WORK_STOP, WORK_STOP];
+let markers = [];
+let routingControl = null;
+let sortable = null;
+const tbody = document.querySelector("#stopsTable tbody");
 
-    let stops = [WORK_STOP, WORK_STOP]; // start + end
-    let markers = [];
-    let routingControl = null;
-    let sortable = null;
+function updateTable() {
+  tbody.innerHTML = "";
+  stops.forEach((stop,i)=>{
+    const row = document.createElement("tr");
+    row.dataset.index=i;
+    let handle = (i===0 || i===stops.length-1) ? "" : "&#9776;";
+    row.innerHTML = `<td class="handle">${handle}</td><td>${stop.name}</td>`;
+    tbody.appendChild(row);
+  });
+}
 
-    const tbody = document.querySelector("#stopsTable tbody");
+function updateMarkers() {
+  markers.forEach(m=>map.removeLayer(m));
+  markers = stops.map((s,i)=>{
+    return L.marker([s.lat,s.lon]).addTo(map).bindTooltip(`${i+1}. ${s.name}`, { permanent:true });
+  });
+  updateRoute();
+}
 
-    function updateTable() {
-      tbody.innerHTML = "";
-      stops.forEach((stop, i) => {
-        const row = document.createElement("tr");
-        row.dataset.index = i;
-        let handle = (i === 0 || i === stops.length-1) ? "" : "&#9776;";
-        row.innerHTML = `<td class="handle">${handle}</td><td>${stop.name}</td>`;
-        tbody.appendChild(row);
-      });
+function updateRoute() {
+  if(routingControl){ map.removeControl(routingControl); routingControl=null; }
+  if(stops.length<2){ if(markers.length===1) map.setView(markers[0].getLatLng(),14); return; }
+  const waypoints = stops.map(s=>L.latLng(s.lat,s.lon));
+  const routeType = document.getElementById("routeType").value;
+  routingControl = L.Routing.control({
+    waypoints: waypoints,
+    lineOptions: { styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
+    addWaypoints:false,
+    draggableWaypoints:false,
+    fitSelectedRoutes:true,
+    show:false,
+    router: new L.Routing.OSRMv1({
+      serviceUrl:"https://router.project-osrm.org/route/v1",
+      profile:"driving",
+      routingOptions:{ preference: routeType }
+    })
+  }).addTo(map);
+}
+
+function initSortable(){
+  if(sortable) sortable.destroy();
+  sortable = Sortable.create(tbody,{
+    handle:'.handle',
+    animation:160,
+    filter:'tr:first-child, tr:last-child',
+    onEnd:function(){
+      const newStops=[];
+      tbody.querySelectorAll('tr').forEach(row=>{ const oldIndex=parseInt(row.dataset.index,10); newStops.push(stops[oldIndex]); });
+      stops=[WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
+      updateTable(); updateMarkers(); initSortable();
     }
+  });
+}
 
-    function updateMarkers() {
-      markers.forEach(m => map.removeLayer(m));
-      markers = stops.map((s, i) => {
-        let marker = L.marker([s.lat, s.lon]).addTo(map)
-          .bindTooltip(`${i+1}. ${s.name}`, {permanent:true});
-        return marker;
-      });
-      updateRoute();
+// Load GPX
+document.getElementById("fileInput").addEventListener("change", async ev=>{
+  const f=ev.target.files && ev.target.files[0]; if(!f) return;
+  const text=await f.text();
+  const xml=(new DOMParser()).parseFromString(text,'text/xml');
+  const geojson = toGeoJSON.gpx(xml);
+  const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==='Point');
+  const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||`Stop`, lat:ft.geometry.coordinates[1], lon:ft.geometry.coordinates[0] }));
+  stops=[WORK_STOP, ...userStops, WORK_STOP];
+  updateTable(); initSortable(); updateMarkers();
+});
+
+// Optimize route button
+document.getElementById("optimizeBtn").addEventListener("click", optimizeStops);
+
+async function optimizeStops() {
+  if(stops.length<=2) return; // nothing to optimize
+  const intermediates=stops.slice(1,-1);
+  const coords = intermediates.map(s=>`${s.lon},${s.lat}`).join(";");
+  const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if(data.code==="Ok"){
+      const optimized = data.trips[0].waypoint_order.map(i=>intermediates[i]);
+      stops=[WORK_STOP, ...optimized, WORK_STOP];
+      updateTable(); updateMarkers(); initSortable();
+    } else {
+      alert("Optimization failed: "+data.message);
     }
+  } catch(err){
+    console.error(err);
+    alert("Error optimizing route: "+err);
+  }
+}
 
-    function updateRoute() {
-      if (routingControl) {
-        map.removeControl(routingControl);
-        routingControl = null;
-      }
-      if (stops.length < 2) return;
+// Route type change
+document.getElementById("routeType").addEventListener("change", updateRoute);
 
-      const waypoints = stops.map(s => L.latLng(s.lat, s.lon));
-      const routeType = document.getElementById("routeType").value;
-
-      routingControl = L.Routing.control({
-        waypoints: waypoints,
-        lineOptions: { styles: [{ color: '#007bff', weight: 4, opacity: 0.8 }] },
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-        show: false,
-        router: new L.Routing.OSRMv1({
-          serviceUrl: "https://router.project-osrm.org/route/v1",
-          profile: "driving",
-          routingOptions: { preference: routeType }
-        })
-      }).addTo(map);
-    }
-
-    function initSortable(){
-      if (sortable) sortable.destroy();
-      sortable = Sortable.create(tbody, {
-        handle: '.handle',
-        animation: 160,
-        filter: 'tr:first-child, tr:last-child', // lock first/last
-        onEnd: function(){
-          const newStops = [];
-          tbody.querySelectorAll('tr').forEach(row => {
-            const oldIndex = parseInt(row.dataset.index, 10);
-            newStops.push(stops[oldIndex]);
-          });
-          stops = [WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
-          updateTable(); updateMarkers(); initSortable();
-        }
-      });
-    }
-
-    // === Optimize Stops ===
-    async function optimizeStops() {
-      if (stops.length <= 2) return;
-
-      const coords = stops.map(s => `${s.lon},${s.lat}`).join(";");
-      const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&destination=last&overview=false`;
-
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.code === "Ok") {
-          // Map waypoint order back to stops
-          const newStops = [];
-          data.trips[0].waypoints.forEach(wp => {
-            newStops[wp.waypoint_index] = stops[wp.waypoint_index];
-          });
-
-          // Rebuild stops in correct order
-          const ordered = data.trips[0].waypoints.sort((a,b)=>a.trip_index-b.trip_index);
-          stops = ordered.map(wp => stops[wp.waypoint_index]);
-
-          updateTable();
-          updateMarkers();
-          initSortable();
-        } else {
-          alert("Optimization failed: " + data.message);
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Error optimizing route");
-      }
-    }
-    document.getElementById("optimizeBtn").addEventListener("click", optimizeStops);
-
-    // === Load GPX ===
-    document.getElementById("fileInput").addEventListener('change', async (ev) => {
-      const f = ev.target.files && ev.target.files[0];
-      if (!f) return;
-      const text = await f.text();
-      const xml = (new DOMParser()).parseFromString(text, 'text/xml');
-      const geojson = toGeoJSON.gpx(xml);
-      const pts = geojson.features.filter(ft => ft.geometry && ft.geometry.type === 'Point');
-
-      const userStops = pts.map((ft,i)=>({
-        name: ft.properties.name || ft.properties.desc || `Stop ${i+1}`,
-        lat: ft.geometry.coordinates[1],
-        lon: ft.geometry.coordinates[0]
-      }));
-
-      stops = [WORK_STOP, ...userStops, WORK_STOP];
-      updateTable(); initSortable(); updateMarkers();
-    });
-
-    // === Route type change ===
-    document.getElementById("routeType").addEventListener("change", updateRoute);
-
-    // Init
-    updateTable(); initSortable(); updateMarkers();
-  </script>
+// Init
+updateTable(); initSortable(); updateMarkers();
+</script>
 </body>
 </html>
