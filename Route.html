@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 <style>
-  html, body { height:100%; }
-  body { margin:0; padding:0; display:flex; height:100vh; font-family: Arial,sans-serif; background:#fafbfc; }
+  html, body { height:100%; margin:0; font-family: Arial, sans-serif; }
+  body { display:flex; flex-direction:row; height:100vh; background:#fafbfc; }
   #map { flex:1; height:100%; min-width:300px; }
   #controls {
     width: 320px; min-width:260px; max-width:360px;
@@ -16,15 +16,11 @@
     border-left:1px solid #ccc;
     padding:20px 16px;
     background:#f9f9f9;
-    box-sizing:border-box;
     display:flex; flex-direction:column; gap:18px;
   }
-  #controls label { font-weight:500; margin-bottom:4px; display:block; }
-  #controls input[type="file"] { margin-bottom:8px; }
   table { width:100%; border-collapse:collapse; margin-top:10px; }
   th, td { border:1px solid #ddd; padding:8px; }
   th { background:#f4f4f4; font-weight:600; }
-  tr.dragging { background:#ffeeba; }
   .handle { cursor:grab; }
   button, select {
     margin-top:10px; padding:6px 10px; border-radius:5px;
@@ -34,8 +30,8 @@
   button[disabled] { opacity:0.6; cursor:not-allowed; }
   #loading { display:none; margin-top:10px; color:#666; font-size:0.95em; }
   @media (max-width:700px){
-    #controls { width:100vw; max-width:none; min-width:0; border-left:none; border-top:1px solid #ccc; }
     body { flex-direction:column; }
+    #controls { width:100vw; max-width:none; border-left:none; border-top:1px solid #ccc; }
     #map { min-height:300px; }
   }
 </style>
@@ -118,14 +114,8 @@ function updateMarkers() {
 
 // --- Route Update ---
 function updateRoute() {
-  if(routingControl){
-    map.removeControl(routingControl);
-    routingControl = null;
-  }
-  if(stops.length<2){
-    if(markers.length===1) map.setView(markers[0].getLatLng(), 14);
-    return;
-  }
+  if(routingControl){ map.removeControl(routingControl); routingControl = null; }
+  if(stops.length<2){ if(markers.length===1) map.setView(markers[0].getLatLng(), 14); return; }
   const waypoints = stops.map(s => L.latLng(s.lat, s.lon));
   const routeType = routeTypeSelect.value;
 
@@ -144,7 +134,7 @@ function updateRoute() {
   }).addTo(map);
 }
 
-// --- Sortable Init ---
+// --- Sortable ---
 function initSortable(){
   if(sortable) sortable.destroy();
   sortable = Sortable.create(tbody, {
@@ -158,9 +148,7 @@ function initSortable(){
         newStops.push(stops[oldIndex]);
       });
       stops = [WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
-      updateTable();
-      updateMarkers();
-      initSortable();
+      updateTable(); updateMarkers(); initSortable();
     }
   });
 }
@@ -193,29 +181,24 @@ document.getElementById("fileInput").addEventListener("change", async ev => {
 // --- Optimize Route ---
 async function optimizeStops() {
   const intermediates = stops.slice(1,-1);
-  if(intermediates.length<2){
-    alert("Not enough stops to optimize (need at least 2 intermediates).");
-    return;
-  }
+  if(intermediates.length<2){ alert("Not enough stops to optimize (need at least 2 intermediates)."); return; }
 
   loadingEl.textContent = "Optimizing route...";
   loadingEl.style.display = 'inline';
 
-  const coords = stops.map(s => `${s.lon},${s.lat}`).join(";");
-  const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
+  try{
+    // Only send intermediates to OSRM Trip API
+    const coords = intermediates.map(s => `${s.lon},${s.lat}`).join(";");
+    const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
 
-  try {
     const res = await fetch(url);
     if(!res.ok) throw new Error(`Network error (${res.status})`);
     const data = await res.json();
 
     if(data.code==="Ok" && data.trips && data.trips[0] && data.trips[0].waypoint_order){
-      const order = data.trips[0].waypoint_order;
-      const newStops = order.map(idx => stops[idx]);
-      stops = [WORK_STOP, ...newStops.filter(s => s !== WORK_STOP && s !== stops[stops.length-1]), WORK_STOP];
-      updateTable();
-      updateMarkers();
-      initSortable();
+      const optimized = data.trips[0].waypoint_order.map(i => intermediates[i]);
+      stops = [WORK_STOP, ...optimized, WORK_STOP];
+      updateTable(); updateMarkers(); initSortable();
     } else {
       alert("Optimization failed or returned no waypoints.");
     }
@@ -233,6 +216,5 @@ routeTypeSelect.addEventListener("change", updateRoute);
 // --- Initialize ---
 updateTable(); initSortable(); updateMarkers();
 </script>
-
 </body>
 </html>
