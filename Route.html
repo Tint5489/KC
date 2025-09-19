@@ -7,34 +7,58 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 <style>
-  body { margin:0; padding:0; display:flex; height:100vh; font-family: Arial,sans-serif; }
-  #map { flex:1; height:100%; }
-  #controls { width: 300px; overflow-y:auto; border-left:1px solid #ccc; padding:10px; background:#f9f9f9; }
+  html, body { height:100%; }
+  body { margin:0; padding:0; display:flex; height:100vh; font-family: Arial,sans-serif; background:#fafbfc; }
+  #map { flex:1; height:100%; min-width:300px; }
+  #controls {
+    width: 320px; min-width:260px; max-width:360px;
+    overflow-y:auto;
+    border-left:1px solid #ccc;
+    padding:20px 16px;
+    background:#f9f9f9;
+    box-sizing:border-box;
+    display:flex; flex-direction:column; gap:18px;
+  }
+  #controls label { font-weight:500; margin-bottom:4px; display:block; }
+  #controls input[type="file"] { margin-bottom:8px; }
   table { width:100%; border-collapse:collapse; margin-top:10px; }
   th, td { border:1px solid #ddd; padding:8px; }
-  th { background:#f4f4f4; }
+  th { background:#f4f4f4; font-weight:600; }
   tr.dragging { background:#ffeeba; }
   .handle { cursor:grab; }
-  button { margin-top:10px; padding:6px 10px; }
+  button, select {
+    margin-top:10px; padding:6px 10px; border-radius:5px;
+    border:1px solid #bbb; font-size:1rem; background:#fff; transition:background 0.2s;
+  }
+  button:active { background:#e2e6ea; }
+  button[disabled] { opacity:0.6; cursor:not-allowed; }
+  #loading { display:none; margin-top:10px; color:#666; font-size:0.95em; }
+  @media (max-width:700px){
+    #controls { width:100vw; max-width:none; min-width:0; border-left:none; border-top:1px solid #ccc; }
+    body { flex-direction:column; }
+    #map { min-height:300px; }
+  }
 </style>
 </head>
 <body>
 
-<div id="map"></div>
+<div id="map" aria-label="Map"></div>
 
-<div id="controls">
-  <input type="file" id="fileInput" accept=".gpx"/>
-  <div style="margin:10px 0;">
-    <label for="routeType">Route type: </label>
-    <select id="routeType">
-      <option value="fastest" selected>Fastest</option>
-      <option value="shortest">Shortest</option>
-    </select>
-  </div>
-  <button id="optimizeBtn">Optimize Route</button>
-  <table id="stopsTable">
+<div id="controls" role="region" aria-label="Route controls">
+  <label for="fileInput">Import stops from GPX file:</label>
+  <input type="file" id="fileInput" accept=".gpx" aria-label="Load GPX file"/>
+
+  <label for="routeType">Route type:</label>
+  <select id="routeType" aria-label="Route type">
+    <option value="fastest" selected>Fastest</option>
+    <option value="shortest">Shortest</option>
+  </select>
+
+  <button id="optimizeBtn" aria-label="Optimize Route">Optimize Route</button>
+  <span id="loading" role="status">Loading...</span>
+  <table id="stopsTable" aria-label="Stops list">
     <thead>
-      <tr><th></th><th>Stop</th></tr>
+      <tr><th aria-label="Drag handle"></th><th>Stop</th></tr>
     </thead>
     <tbody></tbody>
   </table>
@@ -46,45 +70,67 @@
 <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
 
 <script>
+// --- Constants ---
 const WORK_STOP = { name:"BlendBetter", lat:54.971723, lon:-2.949500 };
-let map = L.map('map').setView([54.58303,-2.56954],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
+const DEFAULT_CENTER = [54.58303,-2.56954];
+const DEFAULT_ZOOM = 6;
 
+// --- State ---
 let stops = [WORK_STOP, WORK_STOP];
 let markers = [];
 let routingControl = null;
 let sortable = null;
 
+// --- DOM refs ---
 const tbody = document.querySelector("#stopsTable tbody");
 const routeTypeSelect = document.getElementById("routeType");
+const loadingEl = document.getElementById("loading");
 
+// --- Map ---
+const map = L.map('map', { attributionControl:true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// --- Table Update ---
 function updateTable() {
   tbody.innerHTML = "";
-  stops.forEach((stop,i)=>{
+  stops.forEach((stop, i) => {
     const row = document.createElement("tr");
     row.dataset.index = i;
+    // Only allow drag handles for intermediates
     let handle = (i===0||i===stops.length-1) ? "" : "&#9776;";
-    row.innerHTML = `<td class="handle">${handle}</td><td>${stop.name}</td>`;
+    row.innerHTML = `<td class="handle" title="Drag to reorder">${handle}</td><td>${stop.name}</td>`;
     tbody.appendChild(row);
   });
 }
 
+// --- Marker Update ---
 function updateMarkers() {
-  markers.forEach(m=>map.removeLayer(m));
-  markers = stops.map((s,i)=>{
-    return L.marker([s.lat,s.lon]).addTo(map).bindTooltip(`${i+1}. ${s.name}`,{permanent:true});
-  });
+  markers.forEach(m => map.removeLayer(m));
+  markers = stops.map((s, i) =>
+    L.marker([s.lat, s.lon])
+      .addTo(map)
+      .bindTooltip(`${i+1}. ${s.name}`, { permanent:true })
+  );
   updateRoute();
 }
 
+// --- Route Update ---
 function updateRoute() {
-  if(routingControl){ map.removeControl(routingControl); routingControl=null; }
-  if(stops.length<2){ if(markers.length===1) map.setView(markers[0].getLatLng(),14); return; }
-  const waypoints = stops.map(s=>L.latLng(s.lat,s.lon));
+  if(routingControl){
+    map.removeControl(routingControl);
+    routingControl = null;
+  }
+  if(stops.length<2){
+    if(markers.length===1) map.setView(markers[0].getLatLng(), 14);
+    return;
+  }
+  const waypoints = stops.map(s => L.latLng(s.lat, s.lon));
   const routeType = routeTypeSelect.value;
 
   routingControl = L.Routing.control({
-    waypoints: waypoints,
+    waypoints,
     lineOptions:{ styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
     addWaypoints:false,
     draggableWaypoints:false,
@@ -98,16 +144,17 @@ function updateRoute() {
   }).addTo(map);
 }
 
+// --- Sortable Init ---
 function initSortable(){
   if(sortable) sortable.destroy();
-  sortable = Sortable.create(tbody,{
+  sortable = Sortable.create(tbody, {
     handle:'.handle',
     animation:160,
     filter:'tr:first-child, tr:last-child',
-    onEnd:function(){
+    onEnd: function(){
       const newStops = [];
-      tbody.querySelectorAll('tr').forEach(row=>{
-        const oldIndex = parseInt(row.dataset.index,10);
+      tbody.querySelectorAll('tr').forEach(row => {
+        const oldIndex = parseInt(row.dataset.index, 10);
         newStops.push(stops[oldIndex]);
       });
       stops = [WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
@@ -118,27 +165,46 @@ function initSortable(){
   });
 }
 
-document.getElementById("fileInput").addEventListener("change", async ev=>{
+// --- File Import ---
+document.getElementById("fileInput").addEventListener("change", async ev => {
   const f = ev.target.files && ev.target.files[0];
   if(!f) return;
-  const text = await f.text();
-  const xml = (new DOMParser()).parseFromString(text,"text/xml");
-  const geojson = toGeoJSON.gpx(xml);
-  const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
-  const userStops = pts.map(ft=>({name:ft.properties.name||ft.properties.desc||"Stop", lat:ft.geometry.coordinates[1], lon:ft.geometry.coordinates[0]}));
-  stops = [WORK_STOP, ...userStops, WORK_STOP];
-  updateTable(); initSortable(); updateMarkers();
+  loadingEl.style.display = 'inline';
+  try {
+    const text = await f.text();
+    const xml = new DOMParser().parseFromString(text, "text/xml");
+    const geojson = toGeoJSON.gpx(xml);
+    const pts = geojson.features.filter(ft => ft.geometry && ft.geometry.type==="Point");
+    if (!pts.length) throw new Error("No valid stops found in GPX.");
+    const userStops = pts.map(ft => ({
+      name: ft.properties.name || ft.properties.desc || "Stop",
+      lat: ft.geometry.coordinates[1],
+      lon: ft.geometry.coordinates[0]
+    }));
+    stops = [WORK_STOP, ...userStops, WORK_STOP];
+    updateTable(); initSortable(); updateMarkers();
+  } catch(err){
+    alert("Failed to import GPX file: " + err.message);
+  } finally{
+    loadingEl.style.display = 'none';
+  }
 });
 
+// --- Optimize Route ---
 async function optimizeStops() {
   const intermediates = stops.slice(1,-1);
-  if(intermediates.length<2){ alert("Not enough stops to optimize."); return; }
-
-  const coords = intermediates.map(s=>`${s.lon},${s.lat}`).join(";");
+  if(intermediates.length<2){
+    alert("Not enough stops to optimize (need at least 2 intermediates).");
+    return;
+  }
+  loadingEl.textContent = "Optimizing route...";
+  loadingEl.style.display = 'inline';
+  const coords = intermediates.map(s => `${s.lon},${s.lat}`).join(";");
   const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
 
   try{
     const res = await fetch(url);
+    if(!res.ok) throw new Error(`Network error (${res.status})`);
     const data = await res.json();
     if(data.code==="Ok" && data.trips && data.trips[0] && data.trips[0].waypoint_order){
       const optimized = data.trips[0].waypoint_order.map(i=>intermediates[i]);
@@ -149,14 +215,16 @@ async function optimizeStops() {
     }
   } catch(err){
     console.error(err);
-    alert("Error optimizing route: "+err);
+    alert("Error optimizing route: " + err.message);
+  } finally{
+    loadingEl.style.display = 'none';
   }
 }
 
 document.getElementById("optimizeBtn").addEventListener("click", optimizeStops);
 routeTypeSelect.addEventListener("change", updateRoute);
 
-// Initialize
+// --- Initialize ---
 updateTable(); initSortable(); updateMarkers();
 </script>
 
