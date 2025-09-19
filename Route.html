@@ -22,12 +22,6 @@
   th, td { border:1px solid #ddd; padding:8px; }
   th { background:#f4f4f4; font-weight:600; }
   .handle { cursor:grab; }
-  button, select {
-    margin-top:10px; padding:6px 10px; border-radius:5px;
-    border:1px solid #bbb; font-size:1rem; background:#fff; transition:background 0.2s;
-  }
-  button:active { background:#e2e6ea; }
-  button[disabled] { opacity:0.6; cursor:not-allowed; }
   #loading { display:none; margin-top:10px; color:#666; font-size:0.95em; }
   @media (max-width:700px){
     body { flex-direction:column; }
@@ -43,14 +37,6 @@
 <div id="controls" role="region" aria-label="Route controls">
   <label for="fileInput">Import stops from GPX file:</label>
   <input type="file" id="fileInput" accept=".gpx" aria-label="Load GPX file"/>
-
-  <label for="routeType">Route type:</label>
-  <select id="routeType" aria-label="Route type">
-    <option value="fastest" selected>Fastest</option>
-    <option value="shortest">Shortest</option>
-  </select>
-
-  <button id="optimizeBtn" aria-label="Optimize Route">Optimize Route</button>
   <span id="loading" role="status">Loading...</span>
 
   <table id="stopsTable" aria-label="Stops list">
@@ -80,7 +66,6 @@ let sortable = null;
 
 // --- DOM refs ---
 const tbody = document.querySelector("#stopsTable tbody");
-const routeTypeSelect = document.getElementById("routeType");
 const loadingEl = document.getElementById("loading");
 
 // --- Map ---
@@ -117,7 +102,6 @@ function updateRoute() {
   if(routingControl){ map.removeControl(routingControl); routingControl = null; }
   if(stops.length<2){ if(markers.length===1) map.setView(markers[0].getLatLng(), 14); return; }
   const waypoints = stops.map(s => L.latLng(s.lat, s.lon));
-  const routeType = routeTypeSelect.value;
 
   routingControl = L.Routing.control({
     waypoints,
@@ -125,12 +109,7 @@ function updateRoute() {
     addWaypoints:false,
     draggableWaypoints:false,
     fitSelectedRoutes:true,
-    show:false,
-    router: new L.Routing.OSRMv1({
-      serviceUrl:"https://router.project-osrm.org/route/v1",
-      profile:"driving",
-      routingOptions:{ preference: routeType }
-    })
+    show:false
   }).addTo(map);
 }
 
@@ -177,41 +156,6 @@ document.getElementById("fileInput").addEventListener("change", async ev => {
     loadingEl.style.display = 'none';
   }
 });
-
-// --- Optimize Route ---
-async function optimizeStops() {
-  const intermediates = stops.slice(1,-1);
-  if(intermediates.length<2){ alert("Not enough stops to optimize (need at least 2 intermediates)."); return; }
-
-  loadingEl.textContent = "Optimizing route...";
-  loadingEl.style.display = 'inline';
-
-  try{
-    // Only send intermediates to OSRM Trip API
-    const coords = intermediates.map(s => `${s.lon},${s.lat}`).join(";");
-    const url = `https://router.project-osrm.org/trip/v1/driving/${coords}?source=first&destination=last&roundtrip=false`;
-
-    const res = await fetch(url);
-    if(!res.ok) throw new Error(`Network error (${res.status})`);
-    const data = await res.json();
-
-    if(data.code==="Ok" && data.trips && data.trips[0] && data.trips[0].waypoint_order){
-      const optimized = data.trips[0].waypoint_order.map(i => intermediates[i]);
-      stops = [WORK_STOP, ...optimized, WORK_STOP];
-      updateTable(); updateMarkers(); initSortable();
-    } else {
-      alert("Optimization failed or returned no waypoints.");
-    }
-  } catch(err){
-    console.error(err);
-    alert("Error optimizing route: " + err.message);
-  } finally {
-    loadingEl.style.display = 'none';
-  }
-}
-
-document.getElementById("optimizeBtn").addEventListener("click", optimizeStops);
-routeTypeSelect.addEventListener("change", updateRoute);
 
 // --- Initialize ---
 updateTable(); initSortable(); updateMarkers();
