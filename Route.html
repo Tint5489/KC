@@ -3,19 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>GPX Route Viewer — Mobile-ready, persistent toggle & reorder</title>
+<title>GPX Route Viewer — Routing with Leaflet Routing Machine</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
 <style>
   :root{--accent:#007bff}
   html,body{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}
   body{display:flex;height:100vh;flex-direction:row;overflow:hidden}
 
-  /* Map */
   #map{flex:3;min-width:0}
 
-  /* Sidebar */
   #sidebar{
     flex:0 0 auto;
     background:#f9f9f9;
@@ -23,29 +22,24 @@
     padding:10px;
     box-sizing:border-box;
     min-width:220px;
-    max-width:420px;      /* desktop maximum */
+    max-width:420px;
     transition: transform .28s ease;
     z-index:1200;
     overflow:auto;
   }
-  /* collapsed (off-screen to right) */
   #sidebar.collapsed{ transform: translateX(100%); }
 
-  /* Table wrapper and table sizing so sidebar shrinks to content */
   .table-container{ background:#fff; border:2px solid #dadada; border-radius:6px; box-shadow:0 2px 8px -2px #bbb; padding:6px; overflow:auto; margin-top:10px; }
   table{ border-collapse:collapse; width:max-content; min-width:220px; table-layout:auto; font-size:15px }
   th,td{ padding:8px 10px; border:1px solid #ddd; text-align:left }
   tr{ cursor:grab }
   .handle{ cursor:grab; text-align:center; width:28px; font-size:16px; user-select:none }
 
-  /* numbered marker style (leaflet divIcon class name) */
   .numbered-marker div{ background:var(--accent); color:white; border-radius:50%; width:26px; height:26px; line-height:26px; text-align:center; font-weight:700; border:2px solid white }
 
-  /* resize handle for table height */
   #resizeHandle{ height:36px; background:#eee; border-radius:6px; display:flex; align-items:center; justify-content:center; margin-top:8px; user-select:none; touch-action:none }
   #resizeHandle .hamb span{ display:block; height:3px; width:28px; background:#666; margin:4px 0; border-radius:2px }
 
-  /* persistent toggle arrow (always visible) */
   #sidebarToggle{
     position:fixed;
     right:0;
@@ -64,14 +58,13 @@
     z-index:20000;
   }
 
-  /* small screens: overlay the sidebar; width auto (shrink to table) */
   @media (max-width:820px){
     body{flex-direction:column}
     #map{flex:1;height:100vh}
     #sidebar{
       position:fixed;
       top:0; right:0; bottom:0;
-      width:auto;            /* will size to content */
+      width:auto;
       min-width:200px;
       max-width:92%;
       transform:translateX(0);
@@ -86,23 +79,19 @@
 
   <div id="map"></div>
 
-  <!-- Sidebar toggle button (persistent, outside sidebar) -->
   <div id="sidebarToggle" aria-label="Toggle sidebar">&#x25B6;</div>
 
   <aside id="sidebar" role="complementary" aria-label="Stops sidebar">
     <h2 style="margin:6px 0 8px 0">Stops</h2>
 
-    <!-- FILE INPUT -->
     <label style="display:block; margin-bottom:8px;">
       <input id="gpxFile" type="file" accept=".gpx" />
     </label>
 
-    <!-- resize handle -->
     <div id="resizeHandle" title="Drag to resize table height">
       <div class="hamb"><span></span><span></span><span></span></div>
     </div>
 
-    <!-- table container -->
     <div class="table-container" id="tableContainer" style="height:300px">
       <table id="stopsTable" aria-describedby="Stops list">
         <thead>
@@ -117,6 +106,7 @@
 
   <!-- libraries -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
   <script src="https://unpkg.com/togeojson"></script>
   <script src="https://unpkg.com/sortablejs@1.15.0/Sortable.min.js"></script>
 
@@ -136,21 +126,20 @@ const resizeHandle = document.getElementById('resizeHandle');
 
 let stops = [];
 let markers = [];
-let routeLine = null;
+let routingControl = null;
 let sortable = null;
 
-/* Ensure toggle visible immediately */
 toggleBtn.style.display = 'flex';
 
-/* ===== Utility: render table from stops (uses fragment for performance) ===== */
+/* ===== Table rendering ===== */
 function updateTable(){
   tbody.innerHTML = '';
   const frag = document.createDocumentFragment();
   stops.forEach((s, i) => {
     const tr = document.createElement('tr');
-    tr.dataset.index = i; // important: stores original index for reordering logic
+    tr.dataset.index = i;
     tr.innerHTML = `
-      <td class="handle" aria-hidden="true">&#9776;</td>
+      <td class="handle">&#9776;</td>
       <td>${i+1}</td>
       <td>${escapeHtml(s.name)}</td>
     `;
@@ -158,13 +147,11 @@ function updateTable(){
   });
   tbody.appendChild(frag);
 }
-
-/* small helper to avoid accidental HTML injection in names */
 function escapeHtml(str){
   return String(str || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[ch]));
 }
 
-/* ===== Markers and route ===== */
+/* ===== Markers and routing ===== */
 function clearMarkers(){
   markers.forEach(m => map.removeLayer(m));
   markers = [];
@@ -179,81 +166,74 @@ function updateMarkers(){
   updateRoute();
 }
 function updateRoute(){
-  if(routeLine) { map.removeLayer(routeLine); routeLine = null; }
-  if(stops.length < 2) {
-    // fit to markers if only one
+  if(routingControl){ map.removeControl(routingControl); routingControl=null; }
+  if(stops.length < 2){
     if(markers.length===1) map.setView(markers[0].getLatLng(), 14);
     return;
   }
-  const latlngs = stops.map(s => [s.lat, s.lon]);
-  routeLine = L.polyline(latlngs, { color: '#007bff', weight: 4, opacity:0.8 }).addTo(map);
-  try{
-    const group = L.featureGroup([...markers, routeLine]);
-    map.fitBounds(group.getBounds(), { padding:[40,40] });
-  }catch(e){}
+  const waypoints = stops.map(s => L.latLng(s.lat, s.lon));
+  routingControl = L.Routing.control({
+    waypoints: waypoints,
+    lineOptions: { styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
+    addWaypoints:false,
+    draggableWaypoints:false,
+    fitSelectedRoutes:true,
+    show:false
+  }).addTo(map);
 }
 
-/* ===== Sortable setup (reorder by handle) ===== */
+/* ===== Sortable ===== */
 function initSortable(){
   if(sortable) sortable.destroy();
   sortable = Sortable.create(tbody, {
     handle: '.handle',
     animation: 160,
     onEnd: function(){
-      // rows keep dataset.index which points to the stop index at time of updateTable
       const newStops = [];
       tbody.querySelectorAll('tr').forEach(row => {
         const oldIndex = parseInt(row.dataset.index, 10);
         newStops.push(stops[oldIndex]);
       });
       stops = newStops;
-      updateTable(); updateMarkers(); initSortable(); // refresh indices & markers
+      updateTable(); updateMarkers(); initSortable();
     }
   });
 }
 
-/* ===== GPX load (toGeoJSON) ===== */
+/* ===== GPX load ===== */
 fileInput.addEventListener('change', async (ev) => {
   const f = ev.target.files && ev.target.files[0];
   if(!f) return;
   const text = await f.text();
   const xml = (new DOMParser()).parseFromString(text, 'text/xml');
   const geojson = toGeoJSON.gpx(xml);
-
-  // extract points (waypoints) — fallback also to points in track/route segments
   const pts = geojson.features.filter(ft => ft.geometry && ft.geometry.type === 'Point');
-
-  stops = pts.map((ft, i) => ({
+  stops = pts.map((ft,i)=>({
     name: ft.properties.name || ft.properties.desc || `Stop ${i+1}`,
     lat: ft.geometry.coordinates[1],
     lon: ft.geometry.coordinates[0]
   }));
-
   updateTable(); initSortable(); updateMarkers();
 });
 
-/* ===== Download reordered GPX ===== */
+/* ===== Download GPX ===== */
 downloadBtn.addEventListener('click', ()=>{
   const now = new Date();
   const filename = `Stops-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.gpx`;
   let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="GPXRouteViewer" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-  stops.forEach((s,i)=>{
-    gpx += `  <wpt lat="${s.lat}" lon="${s.lon}"><name>${i+1}. ${escapeXml(s.name)}</name></wpt>\n`;
-  });
+  stops.forEach((s,i)=>{ gpx += `  <wpt lat="${s.lat}" lon="${s.lon}"><name>${i+1}. ${escapeXml(s.name)}</name></wpt>\n`; });
   gpx += `</gpx>`;
-  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const blob = new Blob([gpx], { type:'application/gpx+xml' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  const a = document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click();
   a.remove(); URL.revokeObjectURL(url);
 });
 function escapeXml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
-/* ===== Resize table height (pointer events) ===== */
+/* ===== Resize table ===== */
 let resizing=false, startY=0, startH=0;
 function startResize(e){
-  resizing=true;
-  startY = e.clientY;
-  startH = tableContainer.offsetHeight;
+  resizing=true; startY=e.clientY; startH=tableContainer.offsetHeight;
   document.addEventListener('pointermove', onResize);
   document.addEventListener('pointerup', stopResize);
   e.preventDefault();
@@ -263,7 +243,7 @@ function onResize(e){
   const dy = startY - e.clientY;
   let newH = startH + dy;
   newH = Math.max(120, Math.min(800, newH));
-  tableContainer.style.height = newH + 'px';
+  tableContainer.style.height=newH+'px';
   setTimeout(()=>map.invalidateSize(),50);
   e.preventDefault();
 }
@@ -275,28 +255,14 @@ function stopResize(){
 }
 resizeHandle.addEventListener('pointerdown', startResize);
 
-/* ===== Mobile drawer drag support =====
-   - Drag the small sidebar area to reveal/hide.
-   - Uses px math so toggle button remains independent.
-*/
-const dragHandle = document.createElement('div'); // invisible full height drag area on left edge of sidebar for mobile
-dragHandle.style.position = 'absolute';
-dragHandle.style.left = '-18px';
-dragHandle.style.top = '0';
-dragHandle.style.bottom = '0';
-dragHandle.style.width = '18px';
-dragHandle.style.cursor = 'grab';
-dragHandle.style.zIndex = '1500';
-sidebar.style.position = sidebar.style.position || ''; // no-op, ensures CSS applies
+/* ===== Sidebar drag + toggle ===== */
+const dragHandle=document.createElement('div');
+dragHandle.style.position='absolute'; dragHandle.style.left='-18px'; dragHandle.style.top='0'; dragHandle.style.bottom='0'; dragHandle.style.width='18px'; dragHandle.style.cursor='grab'; dragHandle.style.zIndex='1500';
 sidebar.appendChild(dragHandle);
-
-let dragging = false, startX = 0, startTranslate = 0;
+let dragging=false,startX=0,startTranslate=0;
 function pxSidebarWidth(){ return Math.round(sidebar.getBoundingClientRect().width); }
-
-dragHandle.addEventListener('pointerdown', e => {
-  dragging = true;
-  startX = e.clientX;
-  startTranslate = sidebar.classList.contains('collapsed') ? pxSidebarWidth() : 0;
+dragHandle.addEventListener('pointerdown',e=>{
+  dragging=true; startX=e.clientX; startTranslate=sidebar.classList.contains('collapsed')?pxSidebarWidth():0;
   sidebar.classList.add('dragging');
   document.addEventListener('pointermove', onDrag);
   document.addEventListener('pointerup', endDrag);
@@ -304,81 +270,37 @@ dragHandle.addEventListener('pointerdown', e => {
 });
 function onDrag(e){
   if(!dragging) return;
-  const dx = e.clientX - startX;
-  let newTranslate = startTranslate + dx; // note: dragging right increases translate (collapse)
-  const w = pxSidebarWidth();
-  newTranslate = Math.max(0, Math.min(w, newTranslate));
-  sidebar.style.transform = `translateX(${newTranslate}px)`;
+  const dx=e.clientX-startX; let newTranslate=startTranslate+dx;
+  const w=pxSidebarWidth(); newTranslate=Math.max(0,Math.min(w,newTranslate));
+  sidebar.style.transform=`translateX(${newTranslate}px)`;
 }
 function endDrag(){
-  if(!dragging) return;
-  dragging = false;
+  if(!dragging) return; dragging=false;
   document.removeEventListener('pointermove', onDrag);
   document.removeEventListener('pointerup', endDrag);
   sidebar.classList.remove('dragging');
-  // read final translate
-  const st = window.getComputedStyle(sidebar).transform;
-  let translateX = 0;
-  if(st && st !== 'none'){
-    const m = st.match(/matrix.*\((.+)\)/);
-    if(m) {
-      const parts = m[1].split(',').map(p=>parseFloat(p.trim()));
-      // matrix(a, b, c, d, tx, ty) -> tx is parts[4]
-      translateX = parts[4] || 0;
-    }
-  } else if(sidebar.style.transform){
-    const mm = sidebar.style.transform.match(/translateX\(([-\d.]+)px\)/);
-    translateX = mm ? parseFloat(mm[1]) : 0;
-  }
-  const w = pxSidebarWidth();
-  // snap: if more than half collapsed -> collapse
-  if(translateX > w/2) {
-    sidebar.classList.add('collapsed');
-    sidebar.style.transform = ''; // let class control
-    toggleBtn.innerHTML = '&#x25C0;'; // show open arrow (left)
-  } else {
-    sidebar.classList.remove('collapsed');
-    sidebar.style.transform = '';
-    toggleBtn.innerHTML = '&#x25B6;'; // show collapse arrow (right)
-  }
+  const st=window.getComputedStyle(sidebar).transform; let translateX=0;
+  if(st&&st!=='none'){ const m=st.match(/matrix.*\((.+)\)/); if(m){ const parts=m[1].split(',').map(p=>parseFloat(p.trim())); translateX=parts[4]||0; }}
+  else if(sidebar.style.transform){ const mm=sidebar.style.transform.match(/translateX\(([-\d.]+)px\)/); translateX=mm?parseFloat(mm[1]):0; }
+  const w=pxSidebarWidth();
+  if(translateX>w/2){ sidebar.classList.add('collapsed'); sidebar.style.transform=''; toggleBtn.innerHTML='&#x25C0;'; }
+  else{ sidebar.classList.remove('collapsed'); sidebar.style.transform=''; toggleBtn.innerHTML='&#x25B6;'; }
   setTimeout(()=>map.invalidateSize(),150);
 }
-
-/* ===== Toggle button logic (persistent, always visible) ===== */
-toggleBtn.addEventListener('click', ()=>{
+toggleBtn.addEventListener('click',()=>{
   sidebar.classList.toggle('collapsed');
-  // clear inline transform when toggling so CSS wins
-  sidebar.style.transform = '';
-  const collapsed = sidebar.classList.contains('collapsed');
-  toggleBtn.innerHTML = collapsed ? '&#x25C0;' : '&#x25B6;'; // collapsed => show left arrow to open
-  setTimeout(()=>map.invalidateSize(), 200);
+  sidebar.style.transform='';
+  const collapsed=sidebar.classList.contains('collapsed');
+  toggleBtn.innerHTML=collapsed?'&#x25C0;':'&#x25B6;';
+  setTimeout(()=>map.invalidateSize(),200);
 });
-
-/* ===== Initial behaviour: open sidebar on mobile so file input is visible ===== */
-window.addEventListener('load', ()=>{
-  if(window.innerWidth < 820){
-    sidebar.classList.remove('collapsed');
-    toggleBtn.innerHTML = '&#x25B6;'; // visible -> show collapse arrow
-  } else {
-    // keep it open on desktop too (user requested)
-    sidebar.classList.remove('collapsed');
-    toggleBtn.innerHTML = '&#x25B6;';
-  }
+window.addEventListener('load',()=>{
+  sidebar.classList.remove('collapsed'); toggleBtn.innerHTML='&#x25B6;';
 });
-
-/* Prevent double-click selection when dragging handles */
-document.addEventListener('selectstart', e => {
-  if(dragging || resizing) e.preventDefault();
-});
-
-/* ===== small helper: reflow map when window resizes ===== */
-window.addEventListener('resize', ()=> setTimeout(()=>map.invalidateSize(), 200));
-
-/* ===== Accessibility: keyboard toggle (space/enter) ===== */
-toggleBtn.tabIndex = 0;
-toggleBtn.addEventListener('keydown', e=>{
-  if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBtn.click(); }
-});
+document.addEventListener('selectstart',e=>{ if(dragging||resizing) e.preventDefault(); });
+window.addEventListener('resize',()=> setTimeout(()=>map.invalidateSize(),200));
+toggleBtn.tabIndex=0;
+toggleBtn.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleBtn.click(); }});
 </script>
 </body>
 </html>
