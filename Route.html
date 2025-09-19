@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 <style>
-  html, body { height:100%; margin:0; font-family: Arial, sans-serif; }
-  body { display:flex; flex-direction:row; height:100vh; background:#fafbfc; }
+  html, body { height:100%; }
+  body { margin:0; padding:0; display:flex; height:100vh; font-family: Arial,sans-serif; background:#fafbfc; }
   #map { flex:1; height:100%; min-width:300px; }
   #controls {
     width: 320px; min-width:260px; max-width:360px;
@@ -16,16 +16,19 @@
     border-left:1px solid #ccc;
     padding:20px 16px;
     background:#f9f9f9;
+    box-sizing:border-box;
     display:flex; flex-direction:column; gap:18px;
   }
+  #controls label { font-weight:500; margin-bottom:4px; display:block; }
+  #controls input[type="file"] { margin-bottom:8px; }
   table { width:100%; border-collapse:collapse; margin-top:10px; }
   th, td { border:1px solid #ddd; padding:8px; }
   th { background:#f4f4f4; font-weight:600; }
+  tr.dragging { background:#ffeeba; }
   .handle { cursor:grab; }
-  #loading { display:none; margin-top:10px; color:#666; font-size:0.95em; }
   @media (max-width:700px){
+    #controls { width:100vw; max-width:none; min-width:0; border-left:none; border-top:1px solid #ccc; }
     body { flex-direction:column; }
-    #controls { width:100vw; max-width:none; border-left:none; border-top:1px solid #ccc; }
     #map { min-height:300px; }
   }
 </style>
@@ -37,7 +40,6 @@
 <div id="controls" role="region" aria-label="Route controls">
   <label for="fileInput">Import stops from GPX file:</label>
   <input type="file" id="fileInput" accept=".gpx" aria-label="Load GPX file"/>
-  <span id="loading" role="status">Loading...</span>
 
   <table id="stopsTable" aria-label="Stops list">
     <thead>
@@ -66,13 +68,10 @@ let sortable = null;
 
 // --- DOM refs ---
 const tbody = document.querySelector("#stopsTable tbody");
-const loadingEl = document.getElementById("loading");
 
 // --- Map ---
 const map = L.map('map', { attributionControl:true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution:'&copy; OpenStreetMap contributors'
-}).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
 
 // --- Table Update ---
 function updateTable() {
@@ -80,7 +79,8 @@ function updateTable() {
   stops.forEach((stop, i) => {
     const row = document.createElement("tr");
     row.dataset.index = i;
-    let handle = (i===0||i===stops.length-1) ? "" : "&#9776;";
+    // Only allow drag handles for intermediates
+    const handle = (i===0||i===stops.length-1) ? "" : "&#9776;";
     row.innerHTML = `<td class="handle" title="Drag to reorder">${handle}</td><td>${stop.name}</td>`;
     tbody.appendChild(row);
   });
@@ -99,8 +99,14 @@ function updateMarkers() {
 
 // --- Route Update ---
 function updateRoute() {
-  if(routingControl){ map.removeControl(routingControl); routingControl = null; }
-  if(stops.length<2){ if(markers.length===1) map.setView(markers[0].getLatLng(), 14); return; }
+  if(routingControl){
+    map.removeControl(routingControl);
+    routingControl = null;
+  }
+  if(stops.length < 2){
+    if(markers.length === 1) map.setView(markers[0].getLatLng(), 14);
+    return;
+  }
   const waypoints = stops.map(s => L.latLng(s.lat, s.lon));
 
   routingControl = L.Routing.control({
@@ -108,12 +114,12 @@ function updateRoute() {
     lineOptions:{ styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
     addWaypoints:false,
     draggableWaypoints:false,
-    fitSelectedRoutes:true,
-    show:false
+    show:false,
+    fitSelectedRoutes:false // disable auto zoom
   }).addTo(map);
 }
 
-// --- Sortable ---
+// --- Sortable Init ---
 function initSortable(){
   if(sortable) sortable.destroy();
   sortable = Sortable.create(tbody, {
@@ -127,7 +133,9 @@ function initSortable(){
         newStops.push(stops[oldIndex]);
       });
       stops = [WORK_STOP, ...newStops.slice(1,-1), WORK_STOP];
-      updateTable(); updateMarkers(); initSortable();
+      updateTable();
+      updateMarkers();
+      initSortable();
     }
   });
 }
@@ -136,7 +144,6 @@ function initSortable(){
 document.getElementById("fileInput").addEventListener("change", async ev => {
   const f = ev.target.files && ev.target.files[0];
   if(!f) return;
-  loadingEl.style.display = 'inline';
   try {
     const text = await f.text();
     const xml = new DOMParser().parseFromString(text, "text/xml");
@@ -152,13 +159,12 @@ document.getElementById("fileInput").addEventListener("change", async ev => {
     updateTable(); initSortable(); updateMarkers();
   } catch(err){
     alert("Failed to import GPX file: " + err.message);
-  } finally{
-    loadingEl.style.display = 'none';
   }
 });
 
 // --- Initialize ---
 updateTable(); initSortable(); updateMarkers();
 </script>
+
 </body>
 </html>
