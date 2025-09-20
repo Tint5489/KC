@@ -177,12 +177,13 @@ function updateTable() {
 }
 
 // === Markers ===
+// Updated: Removed stop labels (tooltips), only numbered markers visible
 function updateMarkers() {
   markers.forEach(m=>map.removeLayer(m));
   markers = stops.map((s,i)=>{
     const icon=L.divIcon({ className:'numbered-marker', html:`<div>${i+1}</div>`, iconSize:[30,30], iconAnchor:[15,30] });
-    return L.marker([s.lat,s.lon],{icon}).addTo(map)
-      .bindTooltip(`${i+1}. ${s.name}`,{permanent:true,direction:'top',offset:[0,-36],className:'stop-label'});
+    return L.marker([s.lat,s.lon],{icon}).addTo(map);
+    // .bindTooltip(`${i+1}. ${s.name}`,{permanent:true,direction:'top',offset:[0,-36],className:'stop-label'});
   });
   updateRoute();
 }
