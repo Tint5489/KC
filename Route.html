@@ -134,12 +134,13 @@ function updateRoute(){
 
   const waypoints = stops.map(s=>L.latLng(s.lat,s.lon));
   routingControl = L.Routing.control({
-    waypoints,
+    waypoints: waypoints,
     lineOptions: { styles: [{ color:'#007bff', weight:4, opacity:0.8 }] },
     addWaypoints: false,
     draggableWaypoints: false,
     show: false,
-    fitSelectedRoutes: true
+    fitSelectedRoutes: true,
+    createMarker: function() { return null; } // <-- remove default pins
   }).addTo(map);
 
   addStopLabels();
