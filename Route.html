@@ -1,3 +1,5 @@
+i have this code 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -124,12 +126,17 @@
 
 <script>
 // === Constants ===
-const WORK_STOP = { name:"BlendBetter", lat:54.971723, lon:-2.949500 };
+const WORK_START = { name:"Start", lat:54.971723, lon:-2.949500 };
+const DEFAULT_CENTER = [54.58303,-2.56954];
+const DEFAULT_ZOOM = 6;
+// === Constants ===
+const WORK_STOP = { name:"End", lat:54.971730, lon:-2.949550 };
 const DEFAULT_CENTER = [54.58303,-2.56954];
 const DEFAULT_ZOOM = 6;
 
+
 // === State ===
-let stops = [WORK_STOP, WORK_STOP];
+let stops = [WORK_START, WORK_STOP];
 let markers = [];
 let routingControl = null;
 let sortable = null;
