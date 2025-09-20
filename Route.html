@@ -9,9 +9,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
 <style>
-  html, body {
-    height: 100%; margin: 0; font-family: Arial,Helvetica,sans-serif; width: 100vw; overflow: hidden; background: #fafbfc;
-  }
+  html, body { height:100%; margin:0; font-family:Arial,Helvetica,sans-serif; width:100vw; overflow:hidden; background:#fafbfc; }
   #map { position:absolute; top:0; left:0; right:0; bottom:0; width:100vw; height:100vh; z-index:1; }
 
   #sidebar {
@@ -104,7 +102,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'
 
 function pinIconHtml(num) {
   return `
-    <svg width="24" height="36" viewBox="0 0 34 46" xmlns="http://www.w3.org/2000/svg">
+    <svg width="34" height="46" viewBox="0 0 34 46" xmlns="http://www.w3.org/2000/svg">
       <path d="M17 0C7.6 0 0 7.6 0 17c0 12 13.4 28.2 14.1 29 .5.7 1.3 1.1 2 .9.7.2 1.5-.2 2-.9C20.6 45.2 34 29 34 17 34 7.6 26.4 0 17 0z" fill="#007bff" stroke="#fff" stroke-width="2"/>
       <circle cx="17" cy="17" r="8.5" fill="#fff"/>
       <text x="17" y="22" text-anchor="middle" fill="#007bff" font-size="14" font-family="Arial" font-weight="bold">${num}</text>
@@ -112,37 +110,47 @@ function pinIconHtml(num) {
 }
 
 function updateTable(){
-  tbody.innerHTML="";
+  tbody.innerHTML = "";
   stops.forEach((stop,i)=>{
-    const row=document.createElement("tr");
-    row.dataset.index=i;
-    row.innerHTML=`<td>${i+1}</td><td>${stop.name}</td>`;
+    const row = document.createElement("tr");
+    row.dataset.index = i;
+    row.innerHTML = `<td>${i+1}</td><td>${stop.name}</td>`;
     tbody.appendChild(row);
   });
 }
 
 function updateMarkers(){
-  markers.forEach(m=>map.removeLayer(m));
-  markers=[];
+  // Remove existing markers
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  // Add one marker per stop with number
   stops.forEach((s,i)=>{
-    const icon = L.divIcon({ className:'leaflet-div-icon', html:pinIconHtml(i+1), iconSize:[34,46], iconAnchor:[17,46] });
+    const icon = L.divIcon({
+      className:'leaflet-div-icon',
+      html: pinIconHtml(i+1),
+      iconSize:[34,46],
+      iconAnchor:[17,46]
+    });
     markers.push(L.marker([s.lat,s.lon],{icon}).addTo(map));
   });
+
   updateRoute();
 }
 
 function updateRoute(){
   if(routingControl){ map.removeControl(routingControl); routingControl=null; }
   if(stops.length<2){ routeInfoEl.textContent="Total distance: 0 km, Estimated time: 0h 0m"; return; }
+
   const waypoints=stops.map(s=>L.latLng(s.lat,s.lon));
   routingControl=L.Routing.control({
     waypoints,
     lineOptions:{ styles:[{ color:'#007bff', weight:4, opacity:0.8 }] },
-    addWaypoints:false, draggableWaypoints:false, show:false, fitSelectedRoutes:false
+    addWaypoints:false, draggableWaypoints:false, show:false, fitSelectedRoutes:true
   }).addTo(map);
 
   routingControl.on('routesfound', e=>{
-    const route=e.routes[0];
+    const route = e.routes[0];
     if(route && route.summary){
       const distKm=(route.summary.totalDistance/1000).toFixed(1);
       const totalSec=route.summary.totalTime;
@@ -170,13 +178,13 @@ function initSortable(){
 }
 
 document.getElementById("fileInput").addEventListener("change", async ev=>{
-  const f=ev.target.files && ev.target.files[0]; if(!f) return;
+  const f = ev.target.files && ev.target.files[0]; if(!f) return;
   try{
-    const text=await f.text();
-    const xml=new DOMParser().parseFromString(text,"text/xml");
-    const geojson=toGeoJSON.gpx(xml);
-    const pts=geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
-    const userStops=pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
+    const text = await f.text();
+    const xml = new DOMParser().parseFromString(text,"text/xml");
+    const geojson = toGeoJSON.gpx(xml);
+    const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
+    const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
     stops=[WORK_START,...userStops,WORK_STOP];
     updateTable(); initSortable(); updateMarkers();
   }catch(err){ alert("Failed to import GPX: "+err.message); }
@@ -185,12 +193,13 @@ document.getElementById("fileInput").addEventListener("change", async ev=>{
 toggleBtn.addEventListener('click',()=>{
   sidebar.classList.toggle('collapsed');
   sidebar.style.transform='';
-  toggleBtn.innerHTML=sidebar.classList.contains('collapsed')?'&#x25C0;':'&#x25B6;';
+  toggleBtn.innerHTML = sidebar.classList.contains('collapsed')?'&#x25C0;':'&#x25B6;';
   setTimeout(()=>map.invalidateSize(),200);
 });
+
 window.addEventListener('load',()=>{ sidebar.classList.remove('collapsed'); toggleBtn.innerHTML='&#x25B6;'; });
 
-let resizing=false,startY=0,startH=0;
+let resizing=false, startY=0, startH=0;
 function startResize(e){ resizing=true; startY=e.clientY; startH=tableContainer.offsetHeight; document.addEventListener('pointermove',onResize); document.addEventListener('pointerup',stopResize); e.preventDefault();}
 function onResize(e){ if(!resizing) return; let newH=startH+startY-e.clientY; newH=Math.max(120,Math.min(800,newH)); tableContainer.style.height=newH+'px'; setTimeout(()=>map.invalidateSize(),50);}
 function stopResize(){ resizing=false; document.removeEventListener('pointermove',onResize); document.removeEventListener('pointerup',stopResize); setTimeout(()=>map.invalidateSize(),100);}
