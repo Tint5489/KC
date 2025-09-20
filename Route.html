@@ -96,6 +96,7 @@ const tbody = document.querySelector("#stopsTable tbody");
 const routeInfoEl = document.getElementById("routeInfo");
 const tableContainer = document.getElementById("tableContainer");
 const resizeHandle = document.getElementById("resizeHandle");
+const fileInput = document.getElementById("fileInput");
 
 const map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
@@ -205,8 +206,17 @@ function initSortable(){
   });
 }
 
+// Clear intermediate stops when clicking "Choose file" button
+fileInput.addEventListener("click", () => {
+  stops = [WORK_START, WORK_STOP];
+  updateTable();
+  removeStopLabels();
+  updateRoute(false);
+  resizeTableToFitRows();
+});
+
 // GPX import
-document.getElementById("fileInput").addEventListener("change", async ev=>{
+fileInput.addEventListener("change", async ev=>{
   const f = ev.target.files && ev.target.files[0]; if(!f) return;
   try{
     const text = await f.text();
