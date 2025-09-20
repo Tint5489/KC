@@ -232,7 +232,10 @@ document.getElementById("toggleLocation").addEventListener("click",()=>{
       }else{
         const crossIcon = L.divIcon({
           className:'current-location-icon',
-          html:'<div style="color:red; font-weight:bold; font-size:28px;">&#x2716;</div>', // ✖
+          html:`<svg width="28" height="28" viewBox="0 0 28 28">
+                  <line x1="0" y1="0" x2="28" y2="28" stroke="red" stroke-width="1.5"/>
+                  <line x1="0" y1="28" x2="28" y2="0" stroke="red" stroke-width="1.5"/>
+                </svg>`,
           iconSize:[28,28],
           iconAnchor:[14,14]
         });
