@@ -213,11 +213,13 @@ fileInput.addEventListener("click", () => {
   removeStopLabels();
   updateRoute(false);
   resizeTableToFitRows();
+  fileInput.value = ''; // reset input so it can be used again
 });
 
 // GPX import
 fileInput.addEventListener("change", async ev=>{
-  const f = ev.target.files && ev.target.files[0]; if(!f) return;
+  const f = ev.target.files && ev.target.files[0]; 
+  if(!f) return;
   try{
     const text = await f.text();
     const xml = new DOMParser().parseFromString(text,"text/xml");
@@ -226,6 +228,8 @@ fileInput.addEventListener("change", async ev=>{
     const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
     stops=[WORK_START,...userStops,WORK_STOP];
     updateTable(); initSortable(); resizeTableToFitRows(); updateRoute(true);
+
+    fileInput.value = ''; // reset input to allow reloading same file
   }catch(err){ alert("Failed to import GPX: "+err.message); }
 });
 
