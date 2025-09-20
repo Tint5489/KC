@@ -41,7 +41,6 @@ tr.dragging { background:#ffeeba; }
   background: none !important;
   border: none !important;
   box-shadow: none !important;
-  color: #007bff;
   font-weight: bold;
   font-size: 24px; /* larger number */
   text-align: center;
@@ -119,14 +118,19 @@ function removeStopLabels(){
   stopLabels = [];
 }
 
-// Add numbered labels at each stop (plain larger numbers)
+// Add numbered labels at each stop with dynamic color
 function addStopLabels(){
   removeStopLabels();
   stops.forEach((s,i)=>{
+    let color = "#007bff"; // start blue
+    if(i === 0) color = "#007bff";       
+    else if(i === stops.length - 1) color = "#ff0000"; // end red
+    else color = "#28a745";             // intermediate green
+
     const label = L.marker([s.lat,s.lon], {
       icon: L.divIcon({
         className: 'leaflet-div-icon',
-        html: `${i+1}`,
+        html: `<span style="color:${color}">${i+1}</span>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12]
       }),
@@ -148,8 +152,8 @@ function updateRoute(fitBounds=false){
     addWaypoints: false,
     draggableWaypoints: false,
     show: false,
-    fitSelectedRoutes: false, // don't auto-zoom on reorder
-    createMarker: function() { return null; } // remove default pins
+    fitSelectedRoutes: false,
+    createMarker: function() { return null; } 
   }).addTo(map);
 
   addStopLabels();
@@ -183,7 +187,7 @@ function initSortable(){
         newStops.push(stops[oldIndex]);
       });
       stops = [WORK_START,...newStops.slice(1,-1),WORK_STOP];
-      updateTable(); updateRoute(false); // don't fit bounds on reorder
+      updateTable(); updateRoute(false); // dynamic color updates here
       initSortable();
     }
   });
@@ -199,7 +203,7 @@ document.getElementById("fileInput").addEventListener("change", async ev=>{
     const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
     const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
     stops=[WORK_START,...userStops,WORK_STOP];
-    updateTable(); initSortable(); updateRoute(true); // fit bounds on GPX load
+    updateTable(); initSortable(); updateRoute(true);
   }catch(err){ alert("Failed to import GPX: "+err.message); }
 });
 
