@@ -1,5 +1,3 @@
-i have this code 
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -127,13 +125,9 @@ i have this code
 <script>
 // === Constants ===
 const WORK_START = { name:"Start", lat:54.971723, lon:-2.949500 };
+const WORK_STOP  = { name:"End",   lat:54.971730, lon:-2.949550 };
 const DEFAULT_CENTER = [54.58303,-2.56954];
 const DEFAULT_ZOOM = 6;
-// === Constants ===
-const WORK_STOP = { name:"End", lat:54.971730, lon:-2.949550 };
-const DEFAULT_CENTER = [54.58303,-2.56954];
-const DEFAULT_ZOOM = 6;
-
 
 // === State ===
 let stops = [WORK_START, WORK_STOP];
@@ -218,7 +212,8 @@ function initSortable(){
         const oldIndex=parseInt(row.dataset.index,10);
         newStops.push(stops[oldIndex]);
       });
-      stops=[WORK_STOP,...newStops.slice(1,-1),WORK_STOP];
+      // Always re-wrap with Start and End
+      stops=[WORK_START,...newStops.slice(1,-1),WORK_STOP];
       updateTable(); updateMarkers(); initSortable();
     }
   });
@@ -238,7 +233,7 @@ document.getElementById("fileInput").addEventListener("change", async ev=>{
       lat: ft.geometry.coordinates[1],
       lon: ft.geometry.coordinates[0]
     }));
-    stops=[WORK_STOP,...userStops,WORK_STOP];
+    stops=[WORK_START,...userStops,WORK_STOP];
     updateTable(); initSortable(); updateMarkers();
   }catch(err){ alert("Failed to import GPX: "+err.message); }
 });
