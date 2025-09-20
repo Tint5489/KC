@@ -48,7 +48,6 @@ tr.dragging { background:#ffeeba; }
 
 @media (max-width:820px){
   #sidebar { width:auto; min-width:200px; max-width:92vw; box-shadow:-6px 0 18px rgba(0,0,0,0.25); }
-  .table-container{ max-height:60vh; }
 }
 </style>
 </head>
@@ -140,6 +139,17 @@ function addStopLabels(){
   });
 }
 
+// Resize table to fit rows
+function resizeTableToFitRows(){
+  const rowHeight = 34; // approximate per row
+  const headerHeight = 38; 
+  const padding = 12; 
+  const totalRows = stops.length;
+  const newHeight = Math.min(headerHeight + totalRows * rowHeight + padding, 600); // max 600px
+  tableContainer.style.height = newHeight + "px";
+  setTimeout(()=>map.invalidateSize(), 100);
+}
+
 // Update route
 function updateRoute(fitBounds=false){
   if(routingControl){ map.removeControl(routingControl); routingControl=null; }
@@ -187,7 +197,8 @@ function initSortable(){
         newStops.push(stops[oldIndex]);
       });
       stops = [WORK_START,...newStops.slice(1,-1),WORK_STOP];
-      updateTable(); updateRoute(false); // dynamic color updates here
+      updateTable(); updateRoute(false);
+      resizeTableToFitRows(); // update table height after reorder
       initSortable();
     }
   });
@@ -203,7 +214,7 @@ document.getElementById("fileInput").addEventListener("change", async ev=>{
     const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
     const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
     stops=[WORK_START,...userStops,WORK_STOP];
-    updateTable(); initSortable(); updateRoute(true);
+    updateTable(); initSortable(); resizeTableToFitRows(); updateRoute(true);
   }catch(err){ alert("Failed to import GPX: "+err.message); }
 });
 
@@ -216,14 +227,14 @@ toggleBtn.addEventListener('click',()=>{
 });
 window.addEventListener('load',()=>{ sidebar.classList.remove('collapsed'); toggleBtn.innerHTML='&#x25B6;'; });
 
-// Table resize
+// Table resize handle
 let resizing=false, startY=0, startH=0;
 function startResize(e){ resizing=true; startY=e.clientY; startH=tableContainer.offsetHeight; document.addEventListener('pointermove',onResize); document.addEventListener('pointerup',stopResize); e.preventDefault();}
 function onResize(e){ if(!resizing) return; let newH=startH+startY-e.clientY; newH=Math.max(120,Math.min(800,newH)); tableContainer.style.height=newH+'px'; setTimeout(()=>map.invalidateSize(),50);}
 function stopResize(){ resizing=false; document.removeEventListener('pointermove',onResize); document.removeEventListener('pointerup',stopResize); setTimeout(()=>map.invalidateSize(),100);}
 resizeHandle.addEventListener('pointerdown',startResize);
 
-updateTable(); initSortable(); updateRoute(false);
+updateTable(); initSortable(); resizeTableToFitRows(); updateRoute(false);
 </script>
 </body>
 </html>
