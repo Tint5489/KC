@@ -43,8 +43,6 @@ tr.dragging { background:#ffeeba; }
 #routeInfo { font-weight:500; margin-top:10px; color:#333; }
 .number-icon div { line-height:20px; text-align:center; }
 
-.leaflet-marker-icon, .leaflet-marker-shadow { background:none!important; border:none!important; }
-
 @media (max-width:820px){
   #sidebar { width:auto; min-width:200px; max-width:92vw; box-shadow:-6px 0 18px rgba(0,0,0,0.25); }
 }
@@ -159,7 +157,7 @@ function updateRoute(fitBounds=true){
     draggableWaypoints: false,
     show: false,
     fitSelectedRoutes: fitBounds,
-    createMarker: function() { return null; }
+    createMarker: function() { return null; } // prevents default pins
   }).addTo(map);
 
   routingControl.on('routesfound', e=>{
@@ -234,11 +232,11 @@ document.getElementById("toggleLocation").addEventListener("click",()=>{
       }else{
         const crossIcon = L.divIcon({
           className:'current-location-icon',
-          html:'<div style="color:red; font-weight:bold; font-size:20px;">&#x2716;</div>',
-          iconSize:[20,20],
-          iconAnchor:[10,10]
+          html:'<div style="color:red; font-weight:bold; font-size:28px;">&#x2716;</div>', // ✖
+          iconSize:[28,28],
+          iconAnchor:[14,14]
         });
-        locationMarker = L.marker([lat, lon], {icon: crossIcon, title:"Current Location"}).addTo(map);
+        locationMarker = L.marker([lat, lon], {icon: crossIcon, interactive:false}).addTo(map);
       }
     }, err=>console.warn(err), {enableHighAccuracy:true, maximumAge:0, timeout:5000});
     document.getElementById("toggleLocation").textContent="Disable Current Location";
