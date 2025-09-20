@@ -128,7 +128,7 @@ function addStopLabels(){
 }
 
 // Update route
-function updateRoute(){
+function updateRoute(fitBounds=false){
   if(routingControl){ map.removeControl(routingControl); routingControl=null; }
   if(stops.length<2){ routeInfoEl.textContent="Total distance: 0 km, Estimated time: 0h 0m"; removeStopLabels(); return; }
 
@@ -139,8 +139,8 @@ function updateRoute(){
     addWaypoints: false,
     draggableWaypoints: false,
     show: false,
-    fitSelectedRoutes: true,
-    createMarker: function() { return null; } // <-- remove default pins
+    fitSelectedRoutes: false, // don't auto-zoom on reorder
+    createMarker: function() { return null; } // remove default pins
   }).addTo(map);
 
   addStopLabels();
@@ -155,6 +155,12 @@ function updateRoute(){
       routeInfoEl.textContent=`Total distance: ${distKm} km, Estimated time: ${hours}h ${mins}m`;
     }
   });
+
+  // Fit map bounds only if requested (e.g., after GPX load)
+  if(fitBounds){
+    const bounds = L.latLngBounds(stops.map(s => [s.lat, s.lon]));
+    map.fitBounds(bounds, { padding: [50,50] });
+  }
 }
 
 // Sortable table
@@ -169,7 +175,8 @@ function initSortable(){
         newStops.push(stops[oldIndex]);
       });
       stops = [WORK_START,...newStops.slice(1,-1),WORK_STOP];
-      updateTable(); updateRoute(); initSortable();
+      updateTable(); updateRoute(false); // don't fit bounds on reorder
+      initSortable();
     }
   });
 }
@@ -184,7 +191,7 @@ document.getElementById("fileInput").addEventListener("change", async ev=>{
     const pts = geojson.features.filter(ft=>ft.geometry && ft.geometry.type==="Point");
     const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
     stops=[WORK_START,...userStops,WORK_STOP];
-    updateTable(); initSortable(); updateRoute();
+    updateTable(); initSortable(); updateRoute(true); // fit bounds on GPX load
   }catch(err){ alert("Failed to import GPX: "+err.message); }
 });
 
@@ -204,7 +211,7 @@ function onResize(e){ if(!resizing) return; let newH=startH+startY-e.clientY; ne
 function stopResize(){ resizing=false; document.removeEventListener('pointermove',onResize); document.removeEventListener('pointerup',stopResize); setTimeout(()=>map.invalidateSize(),100);}
 resizeHandle.addEventListener('pointerdown',startResize);
 
-updateTable(); initSortable(); updateRoute();
+updateTable(); initSortable(); updateRoute(false);
 </script>
 </body>
 </html>
