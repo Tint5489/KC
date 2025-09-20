@@ -95,6 +95,7 @@ let sortable = null;
 let locationMarker = null;
 let locationWatch = null;
 let selectedRow = null;
+let wakeLock = null;
 
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('sidebarToggle');
@@ -259,7 +260,7 @@ exportBtn.addEventListener("click",()=>{
 /* --- Row selection & delete --- */
 tbody.addEventListener("click", e => {
   const tr = e.target.closest("tr");
-  if(!tr || tr.classList.contains("locked")) return; // ignore Start/End
+  if(!tr || tr.classList.contains("locked")) return;
   if(selectedRow) selectedRow.style.background="";
   selectedRow = tr;
   selectedRow.style.background="#ffd1b3";
@@ -268,15 +269,34 @@ tbody.addEventListener("click", e => {
 document.getElementById("deleteStop").addEventListener("click", ()=>{
   if(!selectedRow) return;
   const idx = parseInt(selectedRow.dataset.index,10);
-  stops.splice(idx,1); // remove from stops
+  stops.splice(idx,1);
   selectedRow = null;
   updateTable();
   updateMarkers();
   initSortable();
 });
 
-/* --- Init --- */
-window.addEventListener('load',()=>{
+/* --- Screen Wake Lock --- */
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release',()=>console.log('Wake lock released'));
+      console.log('Wake lock active');
+    }
+  }catch(err){ console.warn('Wake Lock failed:', err); }
+}
+async function releaseWakeLock(){
+  if(wakeLock){ await wakeLock.release(); wakeLock=null; }
+}
+// Re-request every 5 minutes
+setInterval(()=>requestWakeLock(), 300000);
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible') requestWakeLock();
+  else releaseWakeLock();
+});
+window.addEventListener('load', ()=>{
+  requestWakeLock();
   sidebar.classList.remove('collapsed');
   toggleBtn.innerHTML='&#x25B6;';
   updateTable(); initSortable(); updateMarkers();
