@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Route Planner with Numbered Stops</title>
+<title>Route Planner with Numbered Stops & Current Location</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
@@ -91,6 +91,7 @@ let stops = [WORK_START, WORK_STOP];
 let routingControl = null;
 let stopLabels = [];
 let sortable = null;
+let currentLocationMarker = null;
 
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('sidebarToggle');
@@ -103,7 +104,7 @@ const fileInput = document.getElementById("fileInput");
 const map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
 
-// Update table
+// Table update
 function updateTable(){
   tbody.innerHTML = "";
   stops.forEach((stop,i)=>{
@@ -114,20 +115,19 @@ function updateTable(){
   });
 }
 
-// Remove existing stop labels
+// Stop labels
 function removeStopLabels(){
   stopLabels.forEach(l => map.removeLayer(l));
   stopLabels = [];
 }
 
-// Add numbered labels at each stop with dynamic color
 function addStopLabels(){
   removeStopLabels();
   stops.forEach((s,i)=>{
-    let color = "#007bff"; // start blue
+    let color = "#007bff"; 
     if(i === 0) color = "#007bff";       
-    else if(i === stops.length - 1) color = "#ff0000"; // end red
-    else color = "#28a745";             // intermediate green
+    else if(i === stops.length - 1) color = "#ff0000"; 
+    else color = "#28a745";             
 
     const label = L.marker([s.lat,s.lon], {
       icon: L.divIcon({
@@ -142,18 +142,18 @@ function addStopLabels(){
   });
 }
 
-// Resize table to fit rows
+// Table height
 function resizeTableToFitRows(){
-  const rowHeight = 34; // approximate per row
+  const rowHeight = 34; 
   const headerHeight = 38; 
   const padding = 12; 
   const totalRows = stops.length;
-  const newHeight = Math.min(headerHeight + totalRows * rowHeight + padding, 600); // max 600px
+  const newHeight = Math.min(headerHeight + totalRows * rowHeight + padding, 600); 
   tableContainer.style.height = newHeight + "px";
   setTimeout(()=>map.invalidateSize(), 100);
 }
 
-// Update route
+// Route
 function updateRoute(fitBounds=false){
   if(routingControl){ map.removeControl(routingControl); routingControl=null; }
   if(stops.length<2){ routeInfoEl.textContent="Total distance: 0 km / 0 mi, Estimated time: 0h 0m"; removeStopLabels(); return; }
@@ -189,7 +189,7 @@ function updateRoute(fitBounds=false){
   }
 }
 
-// Sortable table
+// Sortable
 function initSortable(){
   if(sortable) sortable.destroy();
   sortable = Sortable.create(tbody,{
@@ -202,23 +202,22 @@ function initSortable(){
       });
       stops = [WORK_START,...newStops.slice(1,-1),WORK_STOP];
       updateTable(); updateRoute(false);
-      resizeTableToFitRows(); // update table height after reorder
+      resizeTableToFitRows();
       initSortable();
     }
   });
 }
 
-// Clear intermediate stops when clicking "Choose file" button
+// File input
 fileInput.addEventListener("click", () => {
   stops = [WORK_START, WORK_STOP];
   updateTable();
   removeStopLabels();
   updateRoute(false);
   resizeTableToFitRows();
-  fileInput.value = ''; // reset input so it can be used again
+  fileInput.value = ''; 
 });
 
-// GPX import
 fileInput.addEventListener("change", async ev=>{
   const f = ev.target.files && ev.target.files[0]; 
   if(!f) return;
@@ -230,8 +229,7 @@ fileInput.addEventListener("change", async ev=>{
     const userStops = pts.map(ft=>({ name: ft.properties.name||ft.properties.desc||"Stop", lat: ft.geometry.coordinates[1], lon: ft.geometry.coordinates[0] }));
     stops=[WORK_START,...userStops,WORK_STOP];
     updateTable(); initSortable(); resizeTableToFitRows(); updateRoute(true);
-
-    fileInput.value = ''; // reset input to allow reloading same file
+    fileInput.value = ''; 
   }catch(err){ alert("Failed to import GPX: "+err.message); }
 });
 
@@ -250,6 +248,32 @@ function startResize(e){ resizing=true; startY=e.clientY; startH=tableContainer.
 function onResize(e){ if(!resizing) return; let newH=startH+startY-e.clientY; newH=Math.max(120,Math.min(800,newH)); tableContainer.style.height=newH+'px'; setTimeout(()=>map.invalidateSize(),50);}
 function stopResize(){ resizing=false; document.removeEventListener('pointermove',onResize); document.removeEventListener('pointerup',stopResize); setTimeout(()=>map.invalidateSize(),100);}
 resizeHandle.addEventListener('pointerdown',startResize);
+
+// Current location
+function updateCurrentLocation() {
+  if (!navigator.geolocation) return console.warn("Geolocation not supported");
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    if (!currentLocationMarker) {
+      currentLocationMarker = L.marker([lat, lon], {
+        title: "You are here",
+        icon: L.icon({
+          iconUrl: "https://cdn-icons-png.flaticon.com/512/64/64113.png",
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      }).addTo(map);
+    } else {
+      currentLocationMarker.setLatLng([lat, lon]);
+    }
+  }, err => console.warn("Geolocation error:", err), { enableHighAccuracy: true });
+}
+
+// Initial location and update every 5 minutes
+updateCurrentLocation();
+setInterval(updateCurrentLocation, 5 * 60 * 1000);
 
 updateTable(); initSortable(); resizeTableToFitRows(); updateRoute(false);
 </script>
