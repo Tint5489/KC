@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Route Planner with Numbered Stops & Current Location</title>
+<title>Route Planner with Current Location Toggle</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
@@ -64,6 +64,10 @@ tr.dragging { background:#ffeeba; }
 <label for="fileInput">Import stops from GPX file:</label>
 <input type="file" id="fileInput" accept=".gpx"/>
 
+<div style="margin-top:8px;">
+  <button id="toggleLocationBtn" style="padding:6px 10px;">Show Current Location</button>
+</div>
+
 <div id="routeInfo">Total distance: 0 km / 0 mi, Estimated time: 0h 0m</div>
 
 <div id="resizeHandle" title="Drag to resize table height"><div class="hamb"><span></span><span></span><span></span></div></div>
@@ -92,6 +96,8 @@ let routingControl = null;
 let stopLabels = [];
 let sortable = null;
 let currentLocationMarker = null;
+let locationEnabled = false;
+let locationInterval = null;
 
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('sidebarToggle');
@@ -100,6 +106,7 @@ const routeInfoEl = document.getElementById("routeInfo");
 const tableContainer = document.getElementById("tableContainer");
 const resizeHandle = document.getElementById("resizeHandle");
 const fileInput = document.getElementById("fileInput");
+const toggleLocationBtn = document.getElementById("toggleLocationBtn");
 
 const map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
@@ -249,7 +256,7 @@ function onResize(e){ if(!resizing) return; let newH=startH+startY-e.clientY; ne
 function stopResize(){ resizing=false; document.removeEventListener('pointermove',onResize); document.removeEventListener('pointerup',stopResize); setTimeout(()=>map.invalidateSize(),100);}
 resizeHandle.addEventListener('pointerdown',startResize);
 
-// Current location
+// Current location toggle
 function updateCurrentLocation() {
   if (!navigator.geolocation) return console.warn("Geolocation not supported");
   navigator.geolocation.getCurrentPosition(pos => {
@@ -271,9 +278,19 @@ function updateCurrentLocation() {
   }, err => console.warn("Geolocation error:", err), { enableHighAccuracy: true });
 }
 
-// Initial location and update every 5 minutes
-updateCurrentLocation();
-setInterval(updateCurrentLocation, 5 * 60 * 1000);
+toggleLocationBtn.addEventListener("click", () => {
+  if (!locationEnabled) {
+    updateCurrentLocation(); 
+    locationInterval = setInterval(updateCurrentLocation, 5 * 60 * 1000);
+    toggleLocationBtn.textContent = "Hide Current Location";
+    locationEnabled = true;
+  } else {
+    if (currentLocationMarker) { map.removeLayer(currentLocationMarker); currentLocationMarker = null; }
+    clearInterval(locationInterval);
+    toggleLocationBtn.textContent = "Show Current Location";
+    locationEnabled = false;
+  }
+});
 
 updateTable(); initSortable(); resizeTableToFitRows(); updateRoute(false);
 </script>
