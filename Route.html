@@ -125,7 +125,6 @@ function updateTable(){
   resizeTableToFitRows();
 }
 
-// Auto-fit table height
 function resizeTableToFitRows(){
   const rows = tbody.querySelectorAll("tr").length;
   const height = Math.min(400, rows*28 + 60);
@@ -160,7 +159,7 @@ function updateRoute(fitBounds=true){
     draggableWaypoints: false,
     show: false,
     fitSelectedRoutes: fitBounds,
-    createMarker: function() { return null; } // remove RM default pins
+    createMarker: function() { return null; }
   }).addTo(map);
 
   routingControl.on('routesfound', e=>{
@@ -230,8 +229,17 @@ document.getElementById("toggleLocation").addEventListener("click",()=>{
   }else{
     locationWatch=navigator.geolocation.watchPosition(pos=>{
       const lat=pos.coords.latitude, lon=pos.coords.longitude;
-      if(locationMarker){ locationMarker.setLatLng([lat,lon]); }
-      else{ locationMarker=L.marker([lat,lon],{title:"Current Location"}).addTo(map); }
+      if(locationMarker){
+        locationMarker.setLatLng([lat, lon]);
+      }else{
+        const crossIcon = L.divIcon({
+          className:'current-location-icon',
+          html:'<div style="color:red; font-weight:bold; font-size:20px;">&#x2716;</div>',
+          iconSize:[20,20],
+          iconAnchor:[10,10]
+        });
+        locationMarker = L.marker([lat, lon], {icon: crossIcon, title:"Current Location"}).addTo(map);
+      }
     }, err=>console.warn(err), {enableHighAccuracy:true, maximumAge:0, timeout:5000});
     document.getElementById("toggleLocation").textContent="Disable Current Location";
   }
@@ -289,12 +297,12 @@ async function requestWakeLock(){
 async function releaseWakeLock(){
   if(wakeLock){ await wakeLock.release(); wakeLock=null; }
 }
-// Re-request every 5 minutes
 setInterval(()=>requestWakeLock(), 300000);
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState==='visible') requestWakeLock();
   else releaseWakeLock();
 });
+
 window.addEventListener('load', ()=>{
   requestWakeLock();
   sidebar.classList.remove('collapsed');
