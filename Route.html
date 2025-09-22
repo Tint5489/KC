@@ -57,12 +57,14 @@ tr.dragging { background:#ffeeba; }
 <aside id="sidebar">
   <h2 style="margin:6px 0 8px 0">Route Planner</h2>
 
+  <!-- GPX file input -->
   <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
     <label for="fileInput" id="fileButton" style="background:#007bff;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer;">Choose GPX file(s)</label>
     <input type="file" id="fileInput" accept=".gpx" multiple/>
     <span id="fileLabel" style="font-size:13px; color:#555;">No file chosen</span>
   </div>
 
+  <!-- Buttons -->
   <div style="margin-top:8px; display:flex; gap:12px; flex-wrap:wrap;">
     <div style="display:flex; flex-direction:column; gap:4px;">
       <button id="exportBtn">Export GPX</button>
@@ -72,6 +74,14 @@ tr.dragging { background:#ffeeba; }
       <button id="toggleLocation">Enable Current Location</button>
       <button id="deleteStop">Delete Selected Stops</button>
     </div>
+  </div>
+
+  <!-- Add new stop -->
+  <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+    <input type="text" id="newStopName" placeholder="Stop name" style="flex:2; padding:4px;"/>
+    <input type="number" id="newLat" placeholder="Lat" step="0.000001" style="flex:1; padding:4px;"/>
+    <input type="number" id="newLon" placeholder="Lon" step="0.000001" style="flex:1; padding:4px;"/>
+    <button id="addStopBtn" style="flex:1;">Add Stop</button>
   </div>
 
   <div id="routeInfo">Total distance: 0 km (0 mi), Estimated time: 0h 0m</div>
@@ -220,7 +230,7 @@ function initSortable(){
   });
 }
 
-/* --- File Import (append multiple GPX files) --- */
+/* --- File Import --- */
 fileInput.addEventListener("change", async ev=>{
   const files = ev.target.files;
   if(!files || files.length===0) return;
@@ -272,33 +282,42 @@ toggleBtn.addEventListener('click',()=>{
 });
 
 /* --- Current Location --- */
-document.getElementById("toggleLocation").addEventListener("click",()=>{
-  if(locationWatch){
-    navigator.geolocation.clearWatch(locationWatch);
-    locationWatch=null;
-    if(locationMarker){ map.removeLayer(locationMarker); locationMarker=null; }
-    document.getElementById("toggleLocation").textContent="Enable Current Location";
-  }else{
-    locationWatch=navigator.geolocation.watchPosition(pos=>{
-      const lat=pos.coords.latitude, lon=pos.coords.longitude;
-      if(locationMarker){
+let locationWatchId = null;
+let lastUpdate = 0;
+
+document.getElementById("toggleLocation").addEventListener("click", () => {
+  if (locationWatchId) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+    if (locationMarker) { map.removeLayer(locationMarker); locationMarker = null; }
+    document.getElementById("toggleLocation").textContent = "Enable Current Location";
+  } else {
+    locationWatchId = navigator.geolocation.watchPosition(pos => {
+      const now = Date.now();
+      if (now - lastUpdate < 20000) return;  // only update every 20s
+      lastUpdate = now;
+
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      if (locationMarker) {
         locationMarker.setLatLng([lat, lon]);
-      }else{
+      } else {
         const crossIcon = L.divIcon({
-          className:'current-location-icon',
-          html:`<svg width="28" height="28" viewBox="0 0 28 28">
-                  <line x1="0" y1="0" x2="28" y2="28" stroke="red" stroke-width="1.5"/>
-                  <line x1="0" y1="28" x2="28" y2="0" stroke="red" stroke-width="1.5"/>
-                </svg>`,
-          iconSize:[28,28],
-          iconAnchor:[14,14]
+          className: 'current-location-icon',
+          html: `<svg width="28" height="28" viewBox="0 0 28 28">
+                   <line x1="0" y1="0" x2="28" y2="28" stroke="red" stroke-width="1.5"/>
+                   <line x1="0" y1="28" x2="28" y2="0" stroke="red" stroke-width="1.5"/>
+                 </svg>`,
+          iconSize: [28,28],
+          iconAnchor: [14,14]
         });
         locationMarker = L.marker([lat, lon], {icon: crossIcon, interactive:false}).addTo(map);
       }
-    }, err=>console.warn(err), {enableHighAccuracy:true, maximumAge:0, timeout:5000});
-    document.getElementById("toggleLocation").textContent="Disable Current Location";
+    }, err => console.warn(err), {enableHighAccuracy:true});
+
+    document.getElementById("toggleLocation").textContent = "Disable Current Location";
   }
 });
+
 
 /* --- GPX Export --- */
 document.getElementById("exportBtn").addEventListener("click", ()=>{
@@ -336,6 +355,25 @@ document.getElementById("clearTable").addEventListener("click", ()=>{
   map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 });
 
+/* --- Add Stop by Lat/Lon --- */
+document.getElementById("addStopBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("newStopName").value.trim() || "Stop";
+  const lat = parseFloat(document.getElementById("newLat").value);
+  const lon = parseFloat(document.getElementById("newLon").value);
+
+  if(isNaN(lat) || isNaN(lon)){
+    alert("Please enter valid latitude and longitude!");
+    return;
+  }
+
+  stops.splice(stops.length-1, 0, { name, lat, lon });
+  updateTable(); updateMarkers(); initSortable(); updateRoute(false);
+
+  document.getElementById("newStopName").value="";
+  document.getElementById("newLat").value="";
+  document.getElementById("newLon").value="";
+});
+
 /* --- Screen Wake Lock --- */
 async function requestWakeLock(){
   try{
@@ -355,4 +393,4 @@ window.addEventListener('load', ()=>{
 });
 </script>
 </body>
-</html>
+</html
