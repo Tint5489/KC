@@ -45,7 +45,7 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
     
     <label for="importFile" style="background:#007bff;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;">Choose GPX file(s)</label>
     <input type="file" id="importFile" accept=".gpx" multiple style="display:none;" onchange="importGPX(event)">
-    <span id="fileLabel" style="font-size:12px; color:#555;">No file chosen</span>
+    <span id="fileLabel" style="font-size:12px; color:#555;"></span>
   </div>
 
   <button id="toggleLocation" style="margin-bottom:10px;">Enable Current Location</button>
@@ -85,7 +85,7 @@ function updateStopsTable(){
   stopsBody.innerHTML = stops.map((s,i)=>{
     const locked = (i===0 || i===stops.length-1);
     return `<tr data-index="${i}">
-      <td class="drag-handle">&#9776;</td>
+      <td class="drag-handle" ${locked ? '' : `title="Stop #${i+1}"`}>&#9776;</td>
       <td>${s.name}${locked?" (fixed)":""}</td>
       <td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td>
     </tr>`;
@@ -152,7 +152,7 @@ function exportGPX(){
 function importGPX(event){
   const files = event.target.files;
   const fileLabel = document.getElementById("fileLabel");
-  fileLabel.textContent = files.length ? Array.from(files).map(f=>f.name).join(', ') : 'No file chosen';
+  fileLabel.textContent = files.length ? Array.from(files).map(f=>f.name).join(', ') : '';
   if(!files || files.length===0) return;
 
   Array.from(files).forEach(file=>{
