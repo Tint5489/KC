@@ -28,6 +28,7 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
 #stopsTable th, #stopsTable td { padding:3px 4px; border:1px solid #ccc; }
 #stopsTable thead th { position: sticky; top:0; background:#f1f1f1; z-index:1; }
 
+.drag-handle { cursor:grab; text-align:center; width:20px; }
 .marker-label { color:#fff; border-radius:50%; width:24px; height:24px; line-height:24px; text-align:center; font-weight:bold; border:2px solid white; box-shadow:0 0 2px rgba(0,0,0,0.5);}
 </style>
 </head>
@@ -41,14 +42,17 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
     <button onclick="clearStops()">Clear (keep Start/End)</button>
     <button onclick="exportGPX()">Export GPX</button>
     <button onclick="deleteSelectedStops()">Delete Selected</button>
-    <input type="file" id="importFile" accept=".gpx" multiple onchange="importGPX(event)">
+    
+    <label for="importFile" style="background:#007bff;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;">Choose GPX file(s)</label>
+    <input type="file" id="importFile" accept=".gpx" multiple style="display:none;" onchange="importGPX(event)">
+    <span id="fileLabel" style="font-size:12px; color:#555;">No file chosen</span>
   </div>
 
   <button id="toggleLocation" style="margin-bottom:10px;">Enable Current Location</button>
 
   <div id="tableContainer">
     <table id="stopsTable">
-      <thead><tr><th>#</th><th>Name</th><th>Delete?</th></tr></thead>
+      <thead><tr><th></th><th>Name</th><th>Delete?</th></tr></thead>
       <tbody id="stopsBody"></tbody>
     </table>
   </div>
@@ -81,7 +85,7 @@ function updateStopsTable(){
   stopsBody.innerHTML = stops.map((s,i)=>{
     const locked = (i===0 || i===stops.length-1);
     return `<tr data-index="${i}">
-      <td>${i+1}</td>
+      <td class="drag-handle">&#9776;</td>
       <td>${s.name}${locked?" (fixed)":""}</td>
       <td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td>
     </tr>`;
@@ -103,13 +107,13 @@ function refreshMarkers(){
   });
 }
 
-// Draggable table: only number column
+// Draggable table: only drag-handle
 function initSortable(){
   if(sortable){ try{sortable.destroy();}catch(e){} }
   sortable = Sortable.create(stopsBody, {
-    handle: 'td:first-child', 
+    handle: '.drag-handle',
     animation: 150,
-    filter: 'tr:first-child,tr:last-child', 
+    filter: 'tr:first-child,tr:last-child',
     onEnd: function() {
       const newStops = [];
       stopsBody.querySelectorAll('tr').forEach(row=>{
@@ -144,9 +148,11 @@ function exportGPX(){
   const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="route.gpx"; a.click(); URL.revokeObjectURL(url);
 }
 
-// GPX import with max 25 entries
+// GPX import with max 25 entries + show file names
 function importGPX(event){
   const files = event.target.files;
+  const fileLabel = document.getElementById("fileLabel");
+  fileLabel.textContent = files.length ? Array.from(files).map(f=>f.name).join(', ') : 'No file chosen';
   if(!files || files.length===0) return;
 
   Array.from(files).forEach(file=>{
@@ -179,7 +185,7 @@ function importGPX(event){
   event.target.value="";
 }
 
-// Mapbox routing (road-following polyline)
+// Mapbox routing
 async function calculateRoute(){
   if(routeLine){ map.removeLayer(routeLine); routeLine=null;}
   if(stops.length<2) return;
@@ -193,7 +199,7 @@ async function calculateRoute(){
     if(!data.routes || !data.routes[0]) return alert("No route found");
 
     const geo = data.routes[0].geometry;
-    routeLine = L.geoJSON(geo, {color:'#007bff', weight:4, opacity:0.7}).addTo(map);
+    routeLine = L.geoJSON(geo, {color:'#1E90FF', weight:2, opacity:0.9}).addTo(map);
 
     const distKm=(data.routes[0].distance/1000).toFixed(1);
     const distMi=(data.routes[0].distance/1609.34).toFixed(1);
