@@ -28,7 +28,7 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
 #stopsTable th, #stopsTable td { padding:3px 4px; border:1px solid #ccc; }
 #stopsTable thead th { position: sticky; top:0; background:#f1f1f1; z-index:1; }
 
-.drag-handle { cursor:grab; text-align:center; width:20px; }
+.drag-handle { cursor:grab; text-align:center; width:20px; font-weight:bold; }
 .marker-label { color:#fff; border-radius:50%; width:24px; height:24px; line-height:24px; text-align:center; font-weight:bold; border:2px solid white; box-shadow:0 0 2px rgba(0,0,0,0.5);}
 </style>
 </head>
@@ -52,7 +52,7 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
 
   <div id="tableContainer">
     <table id="stopsTable">
-      <thead><tr><th></th><th>Name</th><th>Delete?</th></tr></thead>
+      <thead><tr><th>#</th><th>Name</th><th>Delete?</th></tr></thead>
       <tbody id="stopsBody"></tbody>
     </table>
   </div>
@@ -85,7 +85,7 @@ function updateStopsTable(){
   stopsBody.innerHTML = stops.map((s,i)=>{
     const locked = (i===0 || i===stops.length-1);
     return `<tr data-index="${i}">
-      <td class="drag-handle" ${locked ? '' : `title="Stop #${i+1}"`}>&#9776;</td>
+      <td class="drag-handle" ${locked ? '' : `title="Drag stop #${i+1}"`}>${i+1}</td>
       <td>${s.name}${locked?" (fixed)":""}</td>
       <td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td>
     </tr>`;
@@ -107,7 +107,7 @@ function refreshMarkers(){
   });
 }
 
-// Draggable table: only drag-handle
+// Draggable table: only number column
 function initSortable(){
   if(sortable){ try{sortable.destroy();}catch(e){} }
   sortable = Sortable.create(stopsBody, {
@@ -148,7 +148,7 @@ function exportGPX(){
   const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="route.gpx"; a.click(); URL.revokeObjectURL(url);
 }
 
-// GPX import with max 25 entries + show file names
+// GPX import
 function importGPX(event){
   const files = event.target.files;
   const fileLabel = document.getElementById("fileLabel");
