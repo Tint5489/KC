@@ -9,11 +9,31 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
 #map { position:absolute; top:0; left:0; right:0; bottom:0; }
 
 #sidebar {
-  position: fixed; top:0; right:0; width:360px; height:100vh;
-  background:#f9f9f9; border-left:1px solid #ccc; padding:10px;
-  box-sizing:border-box; transition: transform 0.3s ease;
-  transform: translateX(0); overflow: visible; z-index:1000;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 360px;
+  background: #f9f9f9;
+  border-left: 1px solid #ccc;
+  padding: 10px;
+  box-sizing: border-box;
+  transition: transform 0.3s ease;
+  transform: translateX(0);
+  z-index: 1000;
+
+  height: auto;           /* allow growth */
+  max-height: 100vh;      /* don’t overflow off screen */
+  overflow-y: auto;       /* scroll only if too tall */
 }
+
+#tableContainer {
+  overflow-y: visible;    /* let it grow with rows */
+  border: 1px solid #ccc;
+  margin-top: 10px;
+  height: auto;           /* no fixed height */
+  max-height: none;       /* remove the cap */
+}
+
 #sidebar.collapsed { transform: translateX(100%); }
 
 #sidebarToggle {
@@ -23,7 +43,7 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
   position:absolute; left:-36px; top:50%; transform:translateY(-50%);
 }
 
-#tableContainer { height:300px; overflow:auto; border:1px solid #ccc; margin-top:10px; }
+#tableContainer { overflow-y:auto; border:1px solid #ccc; margin-top:10px; max-height:400px; }
 #stopsTable { width:100%; border-collapse:collapse; font-size:12px; }
 #stopsTable th, #stopsTable td { padding:3px 4px; border:1px solid #ccc; }
 #stopsTable thead th { position: sticky; top:0; background:#f1f1f1; z-index:1; }
@@ -81,24 +101,31 @@ const routeInfoEl = document.getElementById("routeInfo");
 let sortable = null;
 
 // Table & markers
-function updateStopsTable(){
+function updateStopsTable() {
   stopsBody.innerHTML = stops.map((s,i)=>{
     const locked = (i===0 || i===stops.length-1);
     return `<tr data-index="${i}">
       <td class="drag-handle" ${locked ? '' : `title="Drag stop #${i+1}"`}>${i+1}</td>
-      <td>${s.name}${locked?" (fixed)":""}</td>
-      <td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td>
+      <td>${s.name}${locked ? " (fixed)" : ""}</td>
+      <td>${locked ? "" : '<input type="checkbox" class="deleteChk"/>'}</td>
     </tr>`;
   }).join("");
+
+  // Add one extra empty row for padding below End
+  const emptyRow = document.createElement('tr');
+  emptyRow.innerHTML = `<td colspan="3" style="height:28px;"></td>`;
+  stopsBody.appendChild(emptyRow);
+
   refreshMarkers();
   initSortable();
+  adjustTableHeight();
 }
 
 function refreshMarkers(){
   markers.forEach(m=>map.removeLayer(m));
   markers=[];
   stops.forEach((s,i)=>{
-    let color="rgba(0,123,255,0.4)";
+    let color="rgba(0,123,255,0.8)";
     let popupName=s.name;
     if(i===0){ color="green"; popupName="Start"; }
     else if(i===stops.length-1){ color="red"; popupName="End"; }
@@ -107,7 +134,7 @@ function refreshMarkers(){
   });
 }
 
-// Draggable table: only number column
+// Draggable table
 function initSortable(){
   if(sortable){ try{sortable.destroy();}catch(e){} }
   sortable = Sortable.create(stopsBody, {
@@ -117,13 +144,25 @@ function initSortable(){
     onEnd: function() {
       const newStops = [];
       stopsBody.querySelectorAll('tr').forEach(row=>{
-        newStops.push(stops[parseInt(row.dataset.index)]);
+        if(row.dataset.index !== undefined){
+          newStops.push(stops[parseInt(row.dataset.index)]);
+        }
       });
       stops = [WORK_START, ...newStops.slice(1,-1), WORK_STOP];
       updateStopsTable();
       calculateRoute();
     }
   });
+}
+
+// Adjust table height dynamically
+function adjustTableHeight() {
+  const rowHeight = 28;
+  const headerHeight = stopsBody.closest('table').querySelector('thead').offsetHeight;
+  const numRows = stopsBody.rows.length; // includes extra blank row
+  const maxHeight = 400;
+  const newHeight = Math.min(headerHeight + rowHeight * numRows, maxHeight);
+  document.getElementById('tableContainer').style.height = newHeight + 'px';
 }
 
 // Clear stops
@@ -138,14 +177,16 @@ function deleteSelectedStops(){
   updateStopsTable(); calculateRoute();
 }
 
-// Export GPX
+// Export GPX (only stops between Start/End)
 function exportGPX(){
-  if(stops.length<2) return alert("No stops");
-  let gpx='<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="LeafletRouteApp" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Route</name><trkseg>\n';
-  stops.forEach(s=>{ gpx+=`<trkpt lat="${s.lat}" lon="${s.lon}"><name>${s.name}</name></trkpt>\n`; });
-  gpx+='</trkseg></trk></gpx>';
+  if(stops.length<3) return alert("No intermediate stops to export");
+  let gpx='<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="LeafletRouteApp" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  stops.slice(1,-1).forEach(s=>{
+    gpx+=`<wpt lat="${s.lat}" lon="${s.lon}"><name>${s.name}</name></wpt>\n`;
+  });
+  gpx+='</gpx>';
   const blob=new Blob([gpx],{type:"application/gpx+xml"});
-  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="route.gpx"; a.click(); URL.revokeObjectURL(url);
+  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="waypoints.gpx"; a.click(); URL.revokeObjectURL(url);
 }
 
 // GPX import
@@ -170,15 +211,10 @@ function importGPX(event){
           const name = nameEl ? nameEl.textContent : "Waypoint";
           newStops.push({lat, lon, name});
         }
-
-        const totalAfterAppend = stops.length - 2 + newStops.length;
-        if(totalAfterAppend > 25){ alert("Cannot import: total stops would exceed 25."); return; }
-
         stops = [stops[0], ...stops.slice(1,-1), ...newStops, stops[stops.length-1]];
       } catch(err){ alert("Failed to import GPX: "+err.message); }
       updateStopsTable();
       setTimeout(calculateRoute, 200);
-      if(stops.length>2) map.fitBounds(stops.map(s=>[s.lat,s.lon]), {padding:[40,40]});
     };
     reader.readAsText(file);
   });
@@ -196,10 +232,10 @@ async function calculateRoute(){
   try{
     const resp = await fetch(url);
     const data = await resp.json();
-    if(!data.routes || !data.routes[0]) return alert("No route found");
+    if(!data.routes || !data.routes[0]) return;
 
     const geo = data.routes[0].geometry;
-    routeLine = L.geoJSON(geo, {color:'#1E90FF', weight:2, opacity:0.9}).addTo(map);
+    routeLine = L.geoJSON(geo, {color:'#003366', weight:4, opacity:1}).addTo(map);
 
     const distKm=(data.routes[0].distance/1000).toFixed(1);
     const distMi=(data.routes[0].distance/1609.34).toFixed(1);
@@ -207,9 +243,7 @@ async function calculateRoute(){
     const hours=Math.floor(totalSec/3600);
     const mins=Math.round((totalSec%3600)/60);
     routeInfoEl.textContent=`Total distance: ${distKm} km (${distMi} mi), Estimated time: ${hours}h ${mins}m`;
-
-    map.fitBounds(routeLine.getBounds(), {padding:[40,40]});
-  }catch(err){ console.error(err); alert("Routing failed"); }
+  }catch(err){ console.error(err); }
 }
 
 // Sidebar toggle
