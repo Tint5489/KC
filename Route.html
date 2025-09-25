@@ -13,51 +13,57 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
   top: 0;
   right: 0;
   width: 360px;
+  height: 100vh; 
   background: #f9f9f9;
   border-left: 1px solid #ccc;
   padding: 10px;
   box-sizing: border-box;
-  transition: transform 0.3s ease;
-  transform: translateX(0);
   z-index: 1000;
-
-  height: auto;           /* allow growth */
-  max-height: 100vh;      /* don’t overflow off screen */
-  overflow-y: auto;       /* scroll only if too tall */
-}
-
-#tableContainer {
-  overflow-y: visible;    /* let it grow with rows */
-  border: 1px solid #ccc;
-  margin-top: 10px;
-  height: auto;           /* no fixed height */
-  max-height: none;       /* remove the cap */
+  transition: transform 0.3s ease;
+  overflow-y: auto;
 }
 
 #sidebar.collapsed { transform: translateX(100%); }
 
 #sidebarToggle {
-  width:36px; height:54px; background:#007bff; color:#fff;
+  width:36px; height:54px; 
+  background:#007bff; color:#fff;
   font-size:22px; display:flex; align-items:center; justify-content:center;
-  cursor:pointer; border-radius:6px 0 0 6px; z-index:5000;
-  position:absolute; left:-36px; top:50%; transform:translateY(-50%);
+  cursor:pointer; border-radius:6px 0 0 6px; z-index:6000;
+  
+  position: fixed;
+  right: 360px;
+  top: 50%; 
+  transform: translateY(-50%);
+  transition: right 0.3s ease;
 }
 
-#tableContainer { overflow-y:auto; border:1px solid #ccc; margin-top:10px; max-height:400px; }
+#sidebar.collapsed + #sidebarToggle {
+  right: 0;
+}
+
+#tableContainer {
+  border: 1px solid #ccc;
+  margin-top: 10px;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
 #stopsTable { width:100%; border-collapse:collapse; font-size:12px; }
 #stopsTable th, #stopsTable td { padding:3px 4px; border:1px solid #ccc; }
 #stopsTable thead th { position: sticky; top:0; background:#f1f1f1; z-index:1; }
 
 .drag-handle { cursor:grab; text-align:center; width:20px; font-weight:bold; }
-.marker-label { color:#fff; border-radius:50%; width:24px; height:24px; line-height:24px; text-align:center; font-weight:bold; border:2px solid white; box-shadow:0 0 2px rgba(0,0,0,0.5);}
+.marker-label { color:#fff; border-radius:50%; width:24px; height:24px;
+  line-height:24px; text-align:center; font-weight:bold;
+  border:2px solid white; box-shadow:0 0 2px rgba(0,0,0,0.5);}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
 <aside id="sidebar">
-  <div id="sidebarToggle">&#x25C0;</div>
-
   <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
     <button onclick="clearStops()">Clear (keep Start/End)</button>
     <button onclick="exportGPX()">Export GPX</button>
@@ -80,9 +86,10 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
   <div id="routeInfo" style="margin-top:10px;"></div>
 </aside>
 
+<div id="sidebarToggle">&#x25C0;</div> <!-- always-visible toggle button -->
+
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-
 <script>
 const WORK_START = { name:"Start", lat:54.971630, lon:-2.949631 };
 const WORK_STOP  = { name:"End", lat:54.971653, lon:-2.949319 };
@@ -101,31 +108,25 @@ const routeInfoEl = document.getElementById("routeInfo");
 let sortable = null;
 
 // Table & markers
-function updateStopsTable() {
+function updateStopsTable(){
   stopsBody.innerHTML = stops.map((s,i)=>{
     const locked = (i===0 || i===stops.length-1);
     return `<tr data-index="${i}">
       <td class="drag-handle" ${locked ? '' : `title="Drag stop #${i+1}"`}>${i+1}</td>
-      <td>${s.name}${locked ? " (fixed)" : ""}</td>
-      <td>${locked ? "" : '<input type="checkbox" class="deleteChk"/>'}</td>
+      <td>${s.name}${locked?" (fixed)":""}</td>
+      <td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td>
     </tr>`;
   }).join("");
-
-  // Add one extra empty row for padding below End
-  const emptyRow = document.createElement('tr');
-  emptyRow.innerHTML = `<td colspan="3" style="height:28px;"></td>`;
-  stopsBody.appendChild(emptyRow);
-
+  stopsBody.innerHTML += `<tr><td colspan="3" style="text-align:center;color:#888;">(empty)</td></tr>`;
   refreshMarkers();
   initSortable();
-  adjustTableHeight();
 }
 
 function refreshMarkers(){
   markers.forEach(m=>map.removeLayer(m));
   markers=[];
   stops.forEach((s,i)=>{
-    let color="rgba(0,123,255,0.8)";
+    let color="rgba(0,123,255,0.7)";
     let popupName=s.name;
     if(i===0){ color="green"; popupName="Start"; }
     else if(i===stops.length-1){ color="red"; popupName="End"; }
@@ -143,26 +144,14 @@ function initSortable(){
     filter: 'tr:first-child,tr:last-child',
     onEnd: function() {
       const newStops = [];
-      stopsBody.querySelectorAll('tr').forEach(row=>{
-        if(row.dataset.index !== undefined){
-          newStops.push(stops[parseInt(row.dataset.index)]);
-        }
+      stopsBody.querySelectorAll('tr[data-index]').forEach(row=>{
+        newStops.push(stops[parseInt(row.dataset.index)]);
       });
       stops = [WORK_START, ...newStops.slice(1,-1), WORK_STOP];
       updateStopsTable();
       calculateRoute();
     }
   });
-}
-
-// Adjust table height dynamically
-function adjustTableHeight() {
-  const rowHeight = 28;
-  const headerHeight = stopsBody.closest('table').querySelector('thead').offsetHeight;
-  const numRows = stopsBody.rows.length; // includes extra blank row
-  const maxHeight = 400;
-  const newHeight = Math.min(headerHeight + rowHeight * numRows, maxHeight);
-  document.getElementById('tableContainer').style.height = newHeight + 'px';
 }
 
 // Clear stops
@@ -177,16 +166,14 @@ function deleteSelectedStops(){
   updateStopsTable(); calculateRoute();
 }
 
-// Export GPX (only stops between Start/End)
+// Export GPX (only non-start/end)
 function exportGPX(){
-  if(stops.length<3) return alert("No intermediate stops to export");
+  if(stops.length<=2) return alert("No stops to export");
   let gpx='<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="LeafletRouteApp" xmlns="http://www.topografix.com/GPX/1/1">\n';
-  stops.slice(1,-1).forEach(s=>{
-    gpx+=`<wpt lat="${s.lat}" lon="${s.lon}"><name>${s.name}</name></wpt>\n`;
-  });
+  stops.slice(1,-1).forEach(s=>{ gpx+=`<wpt lat="${s.lat}" lon="${s.lon}"><name>${s.name}</name></wpt>\n`; });
   gpx+='</gpx>';
   const blob=new Blob([gpx],{type:"application/gpx+xml"});
-  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="waypoints.gpx"; a.click(); URL.revokeObjectURL(url);
+  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="stops.gpx"; a.click(); URL.revokeObjectURL(url);
 }
 
 // GPX import
@@ -211,6 +198,7 @@ function importGPX(event){
           const name = nameEl ? nameEl.textContent : "Waypoint";
           newStops.push({lat, lon, name});
         }
+
         stops = [stops[0], ...stops.slice(1,-1), ...newStops, stops[stops.length-1]];
       } catch(err){ alert("Failed to import GPX: "+err.message); }
       updateStopsTable();
@@ -235,7 +223,7 @@ async function calculateRoute(){
     if(!data.routes || !data.routes[0]) return;
 
     const geo = data.routes[0].geometry;
-    routeLine = L.geoJSON(geo, {color:'#003366', weight:4, opacity:1}).addTo(map);
+    routeLine = L.geoJSON(geo, {color:'#00008B', weight:4, opacity:1}).addTo(map);
 
     const distKm=(data.routes[0].distance/1000).toFixed(1);
     const distMi=(data.routes[0].distance/1609.34).toFixed(1);
@@ -250,7 +238,8 @@ async function calculateRoute(){
 document.getElementById("sidebarToggle").addEventListener("click", ()=>{
   const sidebar = document.getElementById("sidebar");
   sidebar.classList.toggle("collapsed");
-  document.getElementById("sidebarToggle").innerHTML = sidebar.classList.contains("collapsed")?'&#x25C0;':'&#x25B6;';
+  const toggleBtn = document.getElementById("sidebarToggle");
+  toggleBtn.innerHTML = sidebar.classList.contains("collapsed")?'&#x25C0;':'&#x25B6;';
   setTimeout(()=>map.invalidateSize(), 300);
 });
 
@@ -275,6 +264,15 @@ document.getElementById("toggleLocation").addEventListener("click",()=>{
     }, err=>console.warn(err), {enableHighAccuracy:true});
     btn.textContent="Disable Current Location";
   }
+});
+
+// Double-click add stop
+map.on("dblclick", e=>{
+  const lat=e.latlng.lat, lon=e.latlng.lng;
+  const name="Stop "+(stops.length-1);
+  stops.splice(stops.length-1,0,{lat,lon,name});
+  updateStopsTable();
+  calculateRoute();
 });
 
 // Init
