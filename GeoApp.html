@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Leaflet Location & Marker App</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+  html, body { margin:0; height:100%; width:100%; font-family:sans-serif; }
+  #map { height:100vh; width:100%; }
+
+  #controls {
+    position: absolute;
+    top: 10px; 
+    left: 66px; /* shifted 15mm to the right */
+    background: white;
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    z-index: 1000;
+  }
+
+  #controls input { width: 150px; margin-right: 4px; }
+
+  /* Current location marker style */
+  .location-dot {
+    width: 10px;
+    height: 10px;
+    background: red;
+    border-radius: 50%;
+  }
+
+  .location-dot.flash {
+    animation: flash 0.8s ease-out 2;
+  }
+
+  @keyframes flash {
+    0%   { opacity: 1; transform: scale(1); }
+    50%  { opacity: 0.3; transform: scale(1.6); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="controls">
+  <input type="text" id="coordsInput" placeholder="lat, lon">
+  <button id="addMarkerBtn">Add Marker</button>
+  <button id="clearMarkersBtn">Clear All Markers</button>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const map = L.map('map').setView([0,0], 2);
+
+// OSM tiles
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+// Current location marker
+let currentMarker = null;
+let lastLat = null, lastLon = null;
+let userMarkers = []; // store manually added markers
+
+navigator.geolocation.watchPosition(
+  pos => {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+
+    const moved = lastLat !== lat || lastLon !== lon;
+    lastLat = lat;
+    lastLon = lon;
+
+    const dotHtml = `<div class="location-dot${moved ? ' flash' : ''}"></div>`;
+
+    if (currentMarker) {
+      currentMarker.setLatLng([lat, lon]);
+      currentMarker.setIcon(L.divIcon({
+        className: '',
+        html: dotHtml,
+        iconSize: [10, 10],
+        iconAnchor: [5, 5]
+      }));
+    } else {
+      currentMarker = L.marker([lat, lon], {
+        icon: L.divIcon({
+          className: '',
+          html: dotHtml,
+          iconSize: [10, 10],
+          iconAnchor: [5, 5]
+        })
+      }).addTo(map);
+      map.setView([lat, lon], 15); // initial center
+    }
+  },
+  err => console.warn(err),
+  { enableHighAccuracy: true }
+);
+
+// Add marker from input
+document.getElementById('addMarkerBtn').addEventListener('click', () => {
+  const val = document.getElementById('coordsInput').value.trim();
+  if (!val.includes(',')) return alert('Enter coordinates as lat, lon');
+
+  const parts = val.split(',').map(p => parseFloat(p.trim()));
+  if (parts.length !== 2 || parts.some(isNaN)) return alert('Invalid numbers');
+
+  const [lat, lon] = parts;
+  const marker = L.marker([lat, lon], {title: `Marker (${lat}, ${lon})`})
+    .addTo(map)
+    .bindPopup(`Marker: ${lat}, ${lon}`)
+    .openPopup();
+
+  userMarkers.push(marker); // store marker
+  map.panTo([lat, lon], {animate: true, duration: 1});
+});
+
+// Clear all user-added markers
+document.getElementById('clearMarkersBtn').addEventListener('click', () => {
+  userMarkers.forEach(m => map.removeLayer(m));
+  userMarkers = [];
+});
+</script>
+</body>
+</html>
