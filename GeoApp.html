@@ -11,7 +11,7 @@
   #controls {
     position: absolute;
     top: 10px; 
-    left: 66px; /* shifted 15mm to the right */
+    left: 66px; /* shifted ~15mm to the right */
     background: white;
     padding: 8px;
     border-radius: 4px;
@@ -119,6 +119,40 @@ document.getElementById('addMarkerBtn').addEventListener('click', () => {
 document.getElementById('clearMarkersBtn').addEventListener('click', () => {
   userMarkers.forEach(m => map.removeLayer(m));
   userMarkers = [];
+});
+
+// Screen Wake Lock
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Screen Wake Lock active');
+      wakeLock.addEventListener('release', () => {
+        console.log('Screen Wake Lock released');
+      });
+    } else {
+      console.warn('Wake Lock API not supported in this browser.');
+    }
+  } catch (err) {
+    console.error(`Failed to acquire wake lock: ${err.message}`);
+  }
+}
+
+// Request initially
+requestWakeLock();
+
+// Reapply every 120 seconds
+setInterval(() => {
+  if (!wakeLock) requestWakeLock();
+}, 120000);
+
+// Re-request if tab visibility changes
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !wakeLock) {
+    requestWakeLock();
+  }
 });
 </script>
 </body>
