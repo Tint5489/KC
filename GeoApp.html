@@ -19,7 +19,23 @@
     z-index: 1000;
   }
 
-  #controls input { width: 150px; margin-right: 4px; }
+  #controls input { 
+    width: 150px; 
+    margin-right: 4px; 
+  }
+
+  /* Mobile: increase input size even more */
+  @media (max-width: 600px) {
+    #controls input {
+      width: 280px;   /* much wider input on mobile */
+      font-size: 18px; /* larger text */
+      padding: 6px;   /* more comfortable tapping */
+    }
+    #controls button {
+      font-size: 16px;
+      padding: 6px 10px;
+    }
+  }
 
   /* Current location marker style */
   .location-dot {
@@ -99,7 +115,8 @@ navigator.geolocation.watchPosition(
 
 // Add marker from input
 document.getElementById('addMarkerBtn').addEventListener('click', () => {
-  const val = document.getElementById('coordsInput').value.trim();
+  const input = document.getElementById('coordsInput');
+  const val = input.value.trim();
   if (!val.includes(',')) return alert('Enter coordinates as lat, lon');
 
   const parts = val.split(',').map(p => parseFloat(p.trim()));
@@ -113,6 +130,9 @@ document.getElementById('addMarkerBtn').addEventListener('click', () => {
 
   userMarkers.push(marker); // store marker
   map.panTo([lat, lon], {animate: true, duration: 1});
+
+  // ✅ Clear input box after adding
+  input.value = "";
 });
 
 // Clear all user-added markers
