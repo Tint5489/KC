@@ -140,6 +140,19 @@ document.getElementById('clearMarkersBtn').addEventListener('click', () => {
   userMarkers.forEach(m => map.removeLayer(m));
   userMarkers = [];
 });
+// Enable double-click to add a marker
+map.on('dblclick', e => {
+  const lat = e.latlng.lat;
+  const lon = e.latlng.lng;
+
+  const marker = L.marker([lat, lon], {title: `Marker (${lat}, ${lon})`})
+    .addTo(map)
+    .bindPopup(`Marker: ${lat.toFixed(6)}, ${lon.toFixed(6)}`)
+    .openPopup();
+
+  userMarkers.push(marker);
+});
+
 
 // Screen Wake Lock
 let wakeLock = null;
