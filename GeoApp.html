@@ -69,37 +69,39 @@
     }
     /* --- END: NEW CSS FOR CHECKBOX --- */
     
-    #toggleDrawerBtn {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1001;
-      transition: top 0.3s ease;
-      background: rgba(255, 255, 255, 0.8);
-      border: 1px solid #ccc;
-      cursor: pointer;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    
-    #toggleDrawerBtn::before {
-      content: '';
-      width: 0;
-      height: 0;
-      border-left: 7px solid transparent;
-      border-right: 7px solid transparent;
-      border-top: 9px solid #007bff;
-      transition: transform 0.3s ease;
-    }
+   #toggleDrawerBtn {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1001;
+    transition: top 0.3s ease;
+    background: #007bff;   /* Blue button */
+    border: none;
+    cursor: pointer;
+    width: 60px;           /* Bigger size */
+    height: 60px;
+    border-radius: 12px;   /* Slightly rounded */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
 
-    #toggleDrawerBtn.arrow-up::before {
-      transform: rotate(180deg);
-    }
+#toggleDrawerBtn::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;   /* Bigger arrow */
+    border-right: 10px solid transparent;
+    border-top: 14px solid white;          /* White arrow */
+    transition: transform 0.3s ease;
+}
+
+#toggleDrawerBtn.arrow-up::before {
+    transform: rotate(180deg);
+}
+
 
     .location-dot {
       width: 10px;
