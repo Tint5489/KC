@@ -2,191 +2,251 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Leaflet Location & Marker App</title>
+<title>Leaflet Location & Marker App with Top Drawer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-  html, body { margin:0; height:100%; width:100%; font-family:sans-serif; }
-  #map { height:100vh; width:100%; }
+    html, body { margin:0; height:100%; width:100%; font-family:sans-serif; }
+    #map { height:100vh; width:100%; }
 
-  #controls {
-    position: absolute;
-    top: 10px; 
-    left: 66px; /* shifted ~15mm to the right */
-    background: white;
-    padding: 8px;
-    border-radius: 4px;
-    box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    z-index: 1000;
-  }
-
-  #controls input { 
-    width: 150px; 
-    margin-right: 4px; 
-  }
-
-  /* Mobile: increase input size even more */
-  @media (max-width: 600px) {
-    #controls input {
-      width: 280px;   /* much wider input on mobile */
-      font-size: 18px; /* larger text */
-      padding: 6px;   /* more comfortable tapping */
+    /* Drawer style */
+    #drawer {
+      position: fixed;
+      top: -250px; /* Adjusted to hide the new checkbox row */
+      left: 0;
+      width: 100%;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      z-index: 1000;
+      transition: top 0.3s ease;
+      padding: 14px;
+      box-sizing: border-box;
     }
-    #controls button {
-      font-size: 16px;
-      padding: 6px 10px;
+
+    #drawer.open { top: 0; }
+
+    #drawer input[type="text"] {
+      width: 100%;
+      padding: 14px;
+      font-size: 20px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      margin-bottom: 12px;
     }
-  }
 
-  /* Current location marker style */
-  .location-dot {
-    width: 10px;
-    height: 10px;
-    background: red;
-    border-radius: 50%;
-  }
+    #drawer .buttonRow {
+      display: flex;
+      gap: 12px;
+    }
 
-  .location-dot.flash {
-    animation: flash 0.8s ease-out 2;
-  }
+    #drawer .buttonRow button {
+      flex: 1;
+      padding: 14px;
+      font-size: 18px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      background: white;
+    }
 
-  @keyframes flash {
-    0%   { opacity: 1; transform: scale(1); }
-    50%  { opacity: 0.3; transform: scale(1.6); }
-    100% { opacity: 1; transform: scale(1); }
-  }
+    /* --- START: NEW CSS FOR CHECKBOX --- */
+    .checkboxRow {
+      display: flex;
+      align-items: center;
+      margin-top: 12px;
+      gap: 8px; /* Space between checkbox and label */
+      font-size: 14px;
+      color: #333;
+      cursor: pointer;
+    }
+
+    .checkboxRow input[type="checkbox"] {
+      /* Reset some default input styles for the checkbox */
+      width: auto;
+      margin: 0;
+    }
+    /* --- END: NEW CSS FOR CHECKBOX --- */
+    
+    #toggleDrawerBtn {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      transition: top 0.3s ease;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid #ccc;
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    #toggleDrawerBtn::before {
+      content: '';
+      width: 0;
+      height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-top: 9px solid #007bff;
+      transition: transform 0.3s ease;
+    }
+
+    #toggleDrawerBtn.arrow-up::before {
+      transform: rotate(180deg);
+    }
+
+    .location-dot {
+      width: 10px;
+      height: 10px;
+      background: red;
+      border-radius: 50%;
+    }
+
+    .location-dot.flash {
+      animation: flash 0.8s ease-out 2;
+    }
+
+    @keyframes flash {
+      0%   { opacity: 1; transform: scale(1); }
+      50%  { opacity: 0.3; transform: scale(1.6); }
+      100% { opacity: 1; transform: scale(1); }
+    }
 </style>
 </head>
 <body>
+
 <div id="map"></div>
-<div id="controls">
+
+<div id="drawer" class="open">
   <input type="text" id="coordsInput" placeholder="lat, lon">
-  <button id="addMarkerBtn">Add Marker</button>
-  <button id="clearMarkersBtn">Clear All Markers</button>
-</div>
+  <div class="buttonRow">
+    <button id="addMarkerBtn">Add Marker</button>
+    <button id="clearMarkersBtn">Clear All Markers</button>
+  </div>
+  <label class="checkboxRow">
+    <input type="checkbox" id="keepOpenCheckbox">
+    Keep open after adding
+  </label>
+  </div>
+
+<button id="toggleDrawerBtn" aria-label="Toggle Drawer"></button>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 const map = L.map('map').setView([0,0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-// OSM tiles
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
+const drawer = document.getElementById('drawer');
+const toggleBtn = document.getElementById('toggleDrawerBtn');
 
-// Current location marker
+function updateToggleButton() {
+  const isOpen = drawer.classList.contains('open');
+  toggleBtn.classList.toggle('arrow-up', isOpen);
+
+  if (isOpen) {
+    toggleBtn.style.top = `${drawer.offsetHeight}px`;
+  } else {
+    toggleBtn.style.top = '0px';
+  }
+}
+
+toggleBtn.addEventListener('click', () => {
+  drawer.classList.toggle('open');
+  updateToggleButton();
+});
+
+window.addEventListener('resize', () => {
+    if (drawer.classList.contains('open')) {
+        updateToggleButton();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(updateToggleButton, 100);
+});
+
 let currentMarker = null;
 let lastLat = null, lastLon = null;
-let userMarkers = []; // store manually added markers
+let userMarkers = [];
 
 navigator.geolocation.watchPosition(
   pos => {
     const lat = pos.coords.latitude;
     const lon = pos.coords.longitude;
-
     const moved = lastLat !== lat || lastLon !== lon;
     lastLat = lat;
     lastLon = lon;
-
     const dotHtml = `<div class="location-dot${moved ? ' flash' : ''}"></div>`;
 
     if (currentMarker) {
       currentMarker.setLatLng([lat, lon]);
-      currentMarker.setIcon(L.divIcon({
-        className: '',
-        html: dotHtml,
-        iconSize: [10, 10],
-        iconAnchor: [5, 5]
-      }));
+      currentMarker.setIcon(L.divIcon({ className:'', html: dotHtml, iconSize:[10,10], iconAnchor:[5,5]}));
     } else {
       currentMarker = L.marker([lat, lon], {
-        icon: L.divIcon({
-          className: '',
-          html: dotHtml,
-          iconSize: [10, 10],
-          iconAnchor: [5, 5]
-        })
+        icon: L.divIcon({ className:'', html: dotHtml, iconSize:[10,10], iconAnchor:[5,5] })
       }).addTo(map);
-      map.setView([lat, lon], 15); // initial center
+      map.setView([lat, lon], 15);
     }
   },
   err => console.warn(err),
   { enableHighAccuracy: true }
 );
 
-// Add marker from input
+// --- START: MODIFIED Add Marker LOGIC ---
 document.getElementById('addMarkerBtn').addEventListener('click', () => {
   const input = document.getElementById('coordsInput');
   const val = input.value.trim();
-  if (!val.includes(',')) return alert('Enter coordinates as lat, lon');
-
-  const parts = val.split(',').map(p => parseFloat(p.trim()));
-  if (parts.length !== 2 || parts.some(isNaN)) return alert('Invalid numbers');
-
+  if(!val.includes(',')) return alert('Enter coordinates as lat, lon');
+  const parts = val.split(',').map(p=>parseFloat(p.trim()));
+  if(parts.length!==2 || parts.some(isNaN)) return alert('Invalid numbers');
   const [lat, lon] = parts;
-  const marker = L.marker([lat, lon], {title: `Marker (${lat}, ${lon})`})
-    .addTo(map)
-    .bindPopup(`Marker: ${lat}, ${lon}`)
-    .openPopup();
+  const marker = L.marker([lat, lon]).addTo(map).bindPopup(`Marker: ${lat}, ${lon}`).openPopup();
+  userMarkers.push(marker);
+  map.panTo([lat, lon], {animate:true, duration:1});
+  input.value = '';
 
-  userMarkers.push(marker); // store marker
-  map.panTo([lat, lon], {animate: true, duration: 1});
-
-  // ✅ Clear input box after adding
-  input.value = "";
+  // Check the state of the checkbox
+  const keepOpenCheckbox = document.getElementById('keepOpenCheckbox');
+  
+  // If the checkbox is NOT checked, close the drawer
+  if (!keepOpenCheckbox.checked) {
+    drawer.classList.remove('open');
+    // We must call this function to update the arrow button's position and direction
+    updateToggleButton();
+  }
 });
+// --- END: MODIFIED Add Marker LOGIC ---
 
-// Clear all user-added markers
 document.getElementById('clearMarkersBtn').addEventListener('click', () => {
-  userMarkers.forEach(m => map.removeLayer(m));
+  userMarkers.forEach(m=>map.removeLayer(m));
   userMarkers = [];
 });
-// Enable double-click to add a marker
+
 map.on('dblclick', e => {
-  const lat = e.latlng.lat;
-  const lon = e.latlng.lng;
-
-  const marker = L.marker([lat, lon], {title: `Marker (${lat}, ${lon})`})
-    .addTo(map)
-    .bindPopup(`Marker: ${lat.toFixed(6)}, ${lon.toFixed(6)}`)
-    .openPopup();
-
+  const { lat, lng } = e.latlng;
+  const marker = L.marker([lat, lng]).addTo(map).bindPopup(`Marker: ${lat.toFixed(5)}, ${lng.toFixed(5)}`).openPopup();
   userMarkers.push(marker);
 });
 
-
-// Screen Wake Lock
 let wakeLock = null;
-
 async function requestWakeLock() {
   try {
-    if ('wakeLock' in navigator) {
+    if('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
-      console.log('Screen Wake Lock active');
-      wakeLock.addEventListener('release', () => {
-        console.log('Screen Wake Lock released');
-      });
-    } else {
-      console.warn('Wake Lock API not supported in this browser.');
+      wakeLock.addEventListener('release', ()=>{});
     }
-  } catch (err) {
-    console.error(`Failed to acquire wake lock: ${err.message}`);
-  }
+  } catch(err){ console.error(err); }
 }
-
-// Request initially
 requestWakeLock();
+setInterval(()=>{if(!wakeLock) requestWakeLock();}, 120000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && !wakeLock) requestWakeLock(); });
 
-// Reapply every 120 seconds
-setInterval(() => {
-  if (!wakeLock) requestWakeLock();
-}, 120000);
-
-// Re-request if tab visibility changes
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && !wakeLock) {
-    requestWakeLock();
-  }
-});
 </script>
 </body>
 </html>
