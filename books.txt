@@ -10,10 +10,9 @@ A Calamity of Souls,David Baldacci,Unread,
 To Die For,David Baldacci,Unread,
 The Company - A Novel of the CIA,Robert Littell,Unread,
 Winter - Penguin Modern Classics,Len Deighton,Unread,Blue
-The Secret of Secrets - Robert Langdon Book 6,Dan Brown,Reading,Orange
 Tom Clancy Support and Defend - A Campus Novel,Mark Greaney,Unread,
 A Life in Secrets - Vera Atkins and the Missing Agents of WWII,Sarah Helm,Unread,
-The Day of the Jackal,Frederick Forsyth,Unread,Black
+The Day of the Jackal,Frederick Forsyth,Reading,Black
 The House in the Woods - Atticus Priest Book 1,Mark Dawson,Unread,
 The Red Room - Atticus Priest Book 3,Mark Dawson,Unread,
 The Puppet Show,M. W. Craven,Unread,
