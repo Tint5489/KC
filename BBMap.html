@@ -257,7 +257,7 @@ async function requestWakeLock() {
   } catch(err){ console.error(err); }
 }
 requestWakeLock();
-setInterval(()=>{if(!wakeLock) requestWakeLock();}, 120000);
+setInterval(()=>{if(!wakeLock) requestWakeLock();}, 1000);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && !wakeLock) requestWakeLock(); });
 
 // --- Fullscreen Control ---
@@ -298,3 +298,4 @@ document.addEventListener('fullscreenchange', () => {
 </script>
 </body>
 </html>
+
