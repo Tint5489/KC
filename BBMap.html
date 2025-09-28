@@ -30,7 +30,7 @@
       width: 100%;
       padding: 14px;
       font-size: 20px;
-	  font-weight: bold;   /* makes text bold */
+      font-weight: bold;   /* makes text bold */
       border-radius: 6px;
       border: 1px solid #ccc;
       box-sizing: border-box;
@@ -52,58 +52,57 @@
       background: white;
     }
 
-    /* --- START: NEW CSS FOR CHECKBOX --- */
+    /* Checkbox row */
     .checkboxRow {
       display: flex;
       align-items: center;
       margin-top: 12px;
-      gap: 8px; /* Space between checkbox and label */
+      gap: 8px;
       font-size: 14px;
       color: #333;
       cursor: pointer;
     }
 
     .checkboxRow input[type="checkbox"] {
-      /* Reset some default input styles for the checkbox */
       width: auto;
       margin: 0;
     }
-    /* --- END: NEW CSS FOR CHECKBOX --- */
     
-   #toggleDrawerBtn {
-    position: fixed;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1001;
-    transition: top 0.3s ease;
-    background: #007bff;   /* Blue button */
-    border: none;
-    cursor: pointer;
-    width: 60px;           /* Bigger size */
-    height: 60px;
-    border-radius: 12px;   /* Slightly rounded */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
+    /* Drawer toggle button */
+    #toggleDrawerBtn {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      transition: top 0.3s ease;
+      background: #007bff;
+      border: none;
+      cursor: pointer;
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
 
-#toggleDrawerBtn::before {
-    content: '';
-    width: 0;
-    height: 0;
-    border-left: 10px solid transparent;   /* Bigger arrow */
-    border-right: 10px solid transparent;
-    border-top: 14px solid white;          /* White arrow */
-    transition: transform 0.3s ease;
-}
+    #toggleDrawerBtn::before {
+      content: '';
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-top: 14px solid white;
+      transition: transform 0.3s ease;
+    }
 
-#toggleDrawerBtn.arrow-up::before {
-    transform: rotate(180deg);
-}
+    #toggleDrawerBtn.arrow-up::before {
+      transform: rotate(180deg);
+    }
 
-
+    /* Location dot */
     .location-dot {
       width: 15px;
       height: 15px;
@@ -119,6 +118,21 @@
       0%   { opacity: 1; transform: scale(1); }
       50%  { opacity: 0.3; transform: scale(1.6); }
       100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Fullscreen button style */
+    .leaflet-bar.fullscreen-btn {
+      background: white;
+      border: none;
+      width: 34px;
+      height: 34px;
+      font-size: 18px;
+      line-height: 32px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .leaflet-bar.fullscreen-btn:hover {
+      background: #f0f0f0;
     }
 </style>
 </head>
@@ -136,13 +150,13 @@
     <input type="checkbox" id="keepOpenCheckbox">
     Keep open after adding
   </label>
-  </div>
+</div>
 
 <button id="toggleDrawerBtn" aria-label="Toggle Drawer"></button>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
-const map = L.map('map').setView([54.971793, -2.949397], 10);
+const map = L.map('map').setView([54.971793, -2.949397], 16);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
 const drawer = document.getElementById('drawer');
@@ -165,13 +179,13 @@ toggleBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', () => {
-    if (drawer.classList.contains('open')) {
-        updateToggleButton();
-    }
+  if (drawer.classList.contains('open')) {
+    updateToggleButton();
+  }
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(updateToggleButton, 100);
+  setTimeout(updateToggleButton, 100);
 });
 
 let currentMarker = null;
@@ -201,7 +215,7 @@ navigator.geolocation.watchPosition(
   { enableHighAccuracy: true }
 );
 
-// --- START: MODIFIED Add Marker LOGIC ---
+// Add marker button logic
 document.getElementById('addMarkerBtn').addEventListener('click', () => {
   const input = document.getElementById('coordsInput');
   const val = input.value.trim();
@@ -214,17 +228,12 @@ document.getElementById('addMarkerBtn').addEventListener('click', () => {
   map.panTo([lat, lon], {animate:true, duration:1});
   input.value = '';
 
-  // Check the state of the checkbox
   const keepOpenCheckbox = document.getElementById('keepOpenCheckbox');
-  
-  // If the checkbox is NOT checked, close the drawer
   if (!keepOpenCheckbox.checked) {
     drawer.classList.remove('open');
-    // We must call this function to update the arrow button's position and direction
     updateToggleButton();
   }
 });
-// --- END: MODIFIED Add Marker LOGIC ---
 
 document.getElementById('clearMarkersBtn').addEventListener('click', () => {
   userMarkers.forEach(m=>map.removeLayer(m));
@@ -237,6 +246,7 @@ map.on('dblclick', e => {
   userMarkers.push(marker);
 });
 
+// Screen wake lock
 let wakeLock = null;
 async function requestWakeLock() {
   try {
@@ -250,6 +260,41 @@ requestWakeLock();
 setInterval(()=>{if(!wakeLock) requestWakeLock();}, 120000);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && !wakeLock) requestWakeLock(); });
 
+// --- Fullscreen Control ---
+L.Control.Fullscreen = L.Control.extend({
+  onAdd: function(map) {
+    const btn = L.DomUtil.create('button', 'leaflet-bar fullscreen-btn');
+    btn.innerHTML = '⛶';  // fullscreen icon
+    btn.title = "Toggle Fullscreen";
+
+    btn.onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+        drawer.classList.remove('open');   // hide drawer
+        updateToggleButton();
+        btn.innerHTML = '✖';  // exit icon
+      } else {
+        document.exitFullscreen();
+        btn.innerHTML = '⛶';  // enter icon
+      }
+    };
+
+    return btn;
+  },
+  onRemove: function(map) {}
+});
+
+L.control.fullscreen = function(opts) {
+  return new L.Control.Fullscreen(opts);
+}
+L.control.fullscreen({ position: 'topleft' }).addTo(map);
+
+document.addEventListener('fullscreenchange', () => {
+  const fsBtn = document.querySelector('.fullscreen-btn');
+  if (!document.fullscreenElement && fsBtn) {
+    fsBtn.innerHTML = '⛶';
+  }
+});
 </script>
 </body>
 </html>
