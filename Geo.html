@@ -70,7 +70,7 @@ async function enableWakeLock() {
     if (wakeLock) wakeLock.addEventListener('release', () => console.log('Screen unlocked'));
     // Setup periodic re-request every 5 minutes
     if (wakeLockTimer) clearInterval(wakeLockTimer);
-    wakeLockTimer = setInterval(enableWakeLock, 5 * 60 * 1000); // 5 minutes
+    wakeLockTimer = setInterval(enableWakeLock, 10 * 1000); // 5 minutes
   } catch (err) {
     console.warn("Wake Lock not supported:", err);
   }
@@ -197,4 +197,5 @@ window.addEventListener("beforeunload", disableWakeLock);
 </script>
 
 </body>
+
 </html>
