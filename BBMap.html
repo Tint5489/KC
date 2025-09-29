@@ -11,7 +11,7 @@
     /* Drawer style */
     #drawer {
       position: fixed;
-      top: -250px; /* Adjusted to hide the new checkbox row */
+      top: -250px;
       left: 0;
       width: 100%;
       background: white;
@@ -23,14 +23,13 @@
       padding: 14px;
       box-sizing: border-box;
     }
-
     #drawer.open { top: 0; }
 
     #drawer input[type="text"] {
       width: 100%;
       padding: 14px;
       font-size: 20px;
-      font-weight: bold;   /* makes text bold */
+      font-weight: bold;
       border-radius: 6px;
       border: 1px solid #ccc;
       box-sizing: border-box;
@@ -41,7 +40,6 @@
       display: flex;
       gap: 12px;
     }
-
     #drawer .buttonRow button {
       flex: 1;
       padding: 14px;
@@ -62,12 +60,8 @@
       color: #333;
       cursor: pointer;
     }
+    .checkboxRow input[type="checkbox"] { width: auto; margin: 0; }
 
-    .checkboxRow input[type="checkbox"] {
-      width: auto;
-      margin: 0;
-    }
-    
     /* Drawer toggle button */
     #toggleDrawerBtn {
       position: fixed;
@@ -87,7 +81,6 @@
       align-items: center;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-
     #toggleDrawerBtn::before {
       content: '';
       width: 0;
@@ -97,10 +90,7 @@
       border-top: 14px solid white;
       transition: transform 0.3s ease;
     }
-
-    #toggleDrawerBtn.arrow-up::before {
-      transform: rotate(180deg);
-    }
+    #toggleDrawerBtn.arrow-up::before { transform: rotate(180deg); }
 
     /* Location dot */
     .location-dot {
@@ -109,18 +99,14 @@
       background: red;
       border-radius: 50%;
     }
-
-    .location-dot.flash {
-      animation: flash 0.8s ease-out 2;
-    }
-
+    .location-dot.flash { animation: flash 0.8s ease-out 2; }
     @keyframes flash {
       0%   { opacity: 1; transform: scale(1); }
       50%  { opacity: 0.3; transform: scale(1.6); }
       100% { opacity: 1; transform: scale(1); }
     }
 
-    /* Fullscreen button style */
+    /* Fullscreen button */
     .leaflet-bar.fullscreen-btn {
       background: white;
       border: none;
@@ -131,14 +117,38 @@
       text-align: center;
       cursor: pointer;
     }
-    .leaflet-bar.fullscreen-btn:hover {
-      background: #f0f0f0;
+    .leaflet-bar.fullscreen-btn:hover { background: #f0f0f0; }
+
+    /* Position bar */
+    #positionBar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(255,255,255,0.9);
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      padding: 6px 0;
+      border-top: 1px solid #ccc;
+      z-index: 1002;
+
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      pointer-events: none;
+    }
+    #positionBar.visible {
+      opacity: 1;
+      pointer-events: auto;
     }
 </style>
 </head>
 <body>
 
 <div id="map"></div>
+
+<!-- Hidden position bar (fades in/out) -->
+<div id="positionBar">Lat: -- , Lon: --</div>
 
 <div id="drawer" class="open">
   <input type="text" id="coordsInput" placeholder="lat, lon">
@@ -158,19 +168,16 @@
 <script>
 const map = L.map('map').setView([54.971793, -2.949397], 16);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+map.attributionControl.addAttribution("© KC 2025");
 
 const drawer = document.getElementById('drawer');
 const toggleBtn = document.getElementById('toggleDrawerBtn');
+const posBar = document.getElementById('positionBar');
 
 function updateToggleButton() {
   const isOpen = drawer.classList.contains('open');
   toggleBtn.classList.toggle('arrow-up', isOpen);
-
-  if (isOpen) {
-    toggleBtn.style.top = `${drawer.offsetHeight}px`;
-  } else {
-    toggleBtn.style.top = '0px';
-  }
+  toggleBtn.style.top = isOpen ? `${drawer.offsetHeight}px` : '0px';
 }
 
 toggleBtn.addEventListener('click', () => {
@@ -179,11 +186,8 @@ toggleBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', () => {
-  if (drawer.classList.contains('open')) {
-    updateToggleButton();
-  }
+  if (drawer.classList.contains('open')) updateToggleButton();
 });
-
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(updateToggleButton, 100);
 });
@@ -197,8 +201,7 @@ navigator.geolocation.watchPosition(
     const lat = pos.coords.latitude;
     const lon = pos.coords.longitude;
     const moved = lastLat !== lat || lastLon !== lon;
-    lastLat = lat;
-    lastLon = lon;
+    lastLat = lat; lastLon = lon;
     const dotHtml = `<div class="location-dot${moved ? ' flash' : ''}"></div>`;
 
     if (currentMarker) {
@@ -210,8 +213,15 @@ navigator.geolocation.watchPosition(
       }).addTo(map);
       map.setView([lat, lon], 15);
     }
+
+    // Update and show position bar
+    posBar.textContent = `Lat: ${lat.toFixed(6)} , Lon: ${lon.toFixed(6)}`;
+    posBar.classList.add("visible");
   },
-  err => console.warn(err),
+  err => {
+    console.warn(err);
+    posBar.classList.remove("visible");
+  },
   { enableHighAccuracy: true }
 );
 
@@ -242,7 +252,7 @@ document.getElementById('clearMarkersBtn').addEventListener('click', () => {
 
 map.on('dblclick', e => {
   const { lat, lng } = e.latlng;
-  const marker = L.marker([lat, lng]).addTo(map).bindPopup(`Marker: ${lat.toFixed(5)}, ${lng.toFixed(5)}`).openPopup();
+  const marker = L.marker([lat, lng]).addTo(map).bindPopup(`Marker: ${lat.toFixed(6)}, ${lng.toFixed(6)}`).openPopup();
   userMarkers.push(marker);
 });
 
@@ -257,45 +267,37 @@ async function requestWakeLock() {
   } catch(err){ console.error(err); }
 }
 requestWakeLock();
-setInterval(()=>{if(!wakeLock) requestWakeLock();}, 1000);
+setInterval(()=>{if(!wakeLock) requestWakeLock();}, 10000);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && !wakeLock) requestWakeLock(); });
 
-// --- Fullscreen Control ---
+// Fullscreen Control
 L.Control.Fullscreen = L.Control.extend({
   onAdd: function(map) {
     const btn = L.DomUtil.create('button', 'leaflet-bar fullscreen-btn');
-    btn.innerHTML = '⛶';  // fullscreen icon
+    btn.innerHTML = '⛶';
     btn.title = "Toggle Fullscreen";
-
     btn.onclick = () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
-        drawer.classList.remove('open');   // hide drawer
+        drawer.classList.remove('open');
         updateToggleButton();
-        btn.innerHTML = '✖';  // exit icon
+        btn.innerHTML = '✖';
       } else {
         document.exitFullscreen();
-        btn.innerHTML = '⛶';  // enter icon
+        btn.innerHTML = '⛶';
       }
     };
-
     return btn;
   },
   onRemove: function(map) {}
 });
-
-L.control.fullscreen = function(opts) {
-  return new L.Control.Fullscreen(opts);
-}
+L.control.fullscreen = opts => new L.Control.Fullscreen(opts);
 L.control.fullscreen({ position: 'topleft' }).addTo(map);
 
 document.addEventListener('fullscreenchange', () => {
   const fsBtn = document.querySelector('.fullscreen-btn');
-  if (!document.fullscreenElement && fsBtn) {
-    fsBtn.innerHTML = '⛶';
-  }
+  if (!document.fullscreenElement && fsBtn) fsBtn.innerHTML = '⛶';
 });
 </script>
 </body>
 </html>
-
