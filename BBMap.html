@@ -5,150 +5,141 @@
 <title>Leaflet Location & Marker App with Top Drawer</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
-    html, body { margin:0; height:100%; width:100%; font-family:sans-serif; }
-    #map { height:100vh; width:100%; }
+  html, body { margin:0; height:100%; width:100%; font-family:sans-serif; }
+  #map { height:100vh; width:100%; }
 
-    /* Drawer style */
-    #drawer {
-      position: fixed;
-      top: -250px;
-      left: 0;
-      width: 100%;
-      background: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      border-bottom-left-radius: 12px;
-      border-bottom-right-radius: 12px;
-      z-index: 1000;
-      transition: top 0.3s ease;
-      padding: 14px;
-      box-sizing: border-box;
-    }
-    #drawer.open { top: 0; }
+  /* Drawer style */
+  #drawer {
+    position: fixed;
+    top: -250px;
+    left: 0;
+    width: 100%;
+    background: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    z-index: 1000;
+    transition: top 0.3s ease;
+    padding: 14px;
+    box-sizing: border-box;
+  }
+  #drawer.open { top: 0; }
 
-    #drawer input[type="text"] {
-      width: 100%;
-      padding: 14px;
-      font-size: 20px;
-      font-weight: bold;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-      margin-bottom: 12px;
-    }
+  #drawer input[type="text"] {
+    width: 100%;
+    padding: 14px;
+    font-size: 20px;
+    font-weight: bold;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+  }
 
-    #drawer .buttonRow {
-      display: flex;
-      gap: 12px;
-    }
-    #drawer .buttonRow button {
-      flex: 1;
-      padding: 14px;
-      font-size: 18px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-      cursor: pointer;
-      background: white;
-    }
+  #drawer .buttonRow { display: flex; gap: 12px; }
+  #drawer .buttonRow button {
+    flex: 1;
+    padding: 14px;
+    font-size: 18px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    background: white;
+  }
 
-    /* Checkbox row */
-    .checkboxRow {
-      display: flex;
-      align-items: center;
-      margin-top: 12px;
-      gap: 8px;
-      font-size: 14px;
-      color: #333;
-      cursor: pointer;
-    }
-    .checkboxRow input[type="checkbox"] { width: auto; margin: 0; }
+  /* Checkbox row */
+  .checkboxRow {
+    display: flex;
+    align-items: center;
+    margin-top: 12px;
+    gap: 8px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+  }
+  .checkboxRow input[type="checkbox"] { width: auto; margin: 0; }
 
-    /* Drawer toggle button */
-    #toggleDrawerBtn {
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1001;
-      transition: top 0.3s ease;
-      background: #007bff;
-      border: none;
-      cursor: pointer;
-      width: 60px;
-      height: 60px;
-      border-radius: 12px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-    #toggleDrawerBtn::before {
-      content: '';
-      width: 0;
-      height: 0;
-      border-left: 10px solid transparent;
-      border-right: 10px solid transparent;
-      border-top: 14px solid white;
-      transition: transform 0.3s ease;
-    }
-    #toggleDrawerBtn.arrow-up::before { transform: rotate(180deg); }
+  /* Drawer toggle button */
+  #toggleDrawerBtn {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1001;
+    transition: top 0.3s ease;
+    background: #007bff;
+    border: none;
+    cursor: pointer;
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  #toggleDrawerBtn::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 14px solid white;
+    transition: transform 0.3s ease;
+  }
+  #toggleDrawerBtn.arrow-up::before { transform: rotate(180deg); }
 
-    /* Location dot */
-    .location-dot {
-      width: 15px;
-      height: 15px;
-      background: red;
-      border-radius: 50%;
-    }
-    .location-dot.flash { animation: flash 0.8s ease-out 2; }
-    @keyframes flash {
-      0%   { opacity: 1; transform: scale(1); }
-      50%  { opacity: 0.3; transform: scale(1.6); }
-      100% { opacity: 1; transform: scale(1); }
-    }
+  /* Location dot */
+  .location-dot {
+    width: 15px;
+    height: 15px;
+    background: red;
+    border-radius: 50%;
+  }
+  .location-dot.flash { animation: flash 0.8s ease-out 2; }
+  @keyframes flash {
+    0%   { opacity: 1; transform: scale(1); }
+    50%  { opacity: 0.3; transform: scale(1.6); }
+    100% { opacity: 1; transform: scale(1); }
+  }
 
-    /* Fullscreen button */
-    .leaflet-bar.fullscreen-btn {
-      background: white;
-      border: none;
-      width: 34px;
-      height: 34px;
-      font-size: 18px;
-      line-height: 32px;
-      text-align: center;
-      cursor: pointer;
-    }
-    .leaflet-bar.fullscreen-btn:hover { background: #f0f0f0; }
+  /* Fullscreen control style */
+  .leaflet-bar.fullscreen-btn {
+    background: white;
+    border: none;
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+    line-height: 32px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .leaflet-bar.fullscreen-btn:hover { background: #f0f0f0; }
 
-    /* Position bar */
-    #positionBar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      background: rgba(255,255,255,0.9);
-      font-size: 16px;
-      font-weight: bold;
-      text-align: center;
-      padding: 6px 0;
-      border-top: 1px solid #ccc;
-      z-index: 1002;
+  /* Bottom position bar - plain black text, transparent, always visible */
+  #positionBar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: transparent;  /* fully transparent */
+    font-size: 22px;
+    font-weight: bold;
+    text-align: center;
+    padding: 6px 0;
+    z-index: 1002;
+    color: #000;              /* plain black text */
+    pointer-events: none;
+  }
 
-      opacity: 0;
-      transition: opacity 0.5s ease;
-      pointer-events: none;
-    }
-    #positionBar.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
 </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- Hidden position bar (fades in/out) -->
-<div id="positionBar">Lat: -- , Lon: --</div>
+<!-- Bottom position bar -->
+<div id="positionBar">Current Lat: -- , Lon: --</div>
 
 <div id="drawer" class="open">
   <input type="text" id="coordsInput" placeholder="lat, lon">
@@ -188,44 +179,36 @@ toggleBtn.addEventListener('click', () => {
 window.addEventListener('resize', () => {
   if (drawer.classList.contains('open')) updateToggleButton();
 });
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(updateToggleButton, 100);
-});
+document.addEventListener('DOMContentLoaded', () => setTimeout(updateToggleButton, 100));
 
 let currentMarker = null;
 let lastLat = null, lastLon = null;
 let userMarkers = [];
 
+// Geolocation watcher: update bottom bar always
 navigator.geolocation.watchPosition(
   pos => {
     const lat = pos.coords.latitude;
     const lon = pos.coords.longitude;
-    const moved = lastLat !== lat || lastLon !== lon;
     lastLat = lat; lastLon = lon;
-    const dotHtml = `<div class="location-dot${moved ? ' flash' : ''}"></div>`;
 
+    const dotHtml = `<div class="location-dot flash"></div>`;
     if (currentMarker) {
       currentMarker.setLatLng([lat, lon]);
       currentMarker.setIcon(L.divIcon({ className:'', html: dotHtml, iconSize:[10,10], iconAnchor:[5,5]}));
     } else {
-      currentMarker = L.marker([lat, lon], {
-        icon: L.divIcon({ className:'', html: dotHtml, iconSize:[10,10], iconAnchor:[5,5] })
-      }).addTo(map);
+      currentMarker = L.marker([lat, lon], { icon: L.divIcon({ className:'', html: dotHtml, iconSize:[10,10], iconAnchor:[5,5] }) }).addTo(map);
       map.setView([lat, lon], 15);
     }
 
-    // Update and show position bar
-    posBar.textContent = `Lat: ${lat.toFixed(6)} , Lon: ${lon.toFixed(6)}`;
-    posBar.classList.add("visible");
+    // Update position bar
+    posBar.textContent = `Current Lat: ${lat.toFixed(5)} , Lon: ${lon.toFixed(5)}`;
   },
-  err => {
-    console.warn(err);
-    posBar.classList.remove("visible");
-  },
-  { enableHighAccuracy: true }
+  err => { console.warn('Geolocation error:', err); }
+  , { enableHighAccuracy: true }
 );
 
-// Add marker button logic
+// Add marker button
 document.getElementById('addMarkerBtn').addEventListener('click', () => {
   const input = document.getElementById('coordsInput');
   const val = input.value.trim();
@@ -237,9 +220,7 @@ document.getElementById('addMarkerBtn').addEventListener('click', () => {
   userMarkers.push(marker);
   map.panTo([lat, lon], {animate:true, duration:1});
   input.value = '';
-
-  const keepOpenCheckbox = document.getElementById('keepOpenCheckbox');
-  if (!keepOpenCheckbox.checked) {
+  if (!document.getElementById('keepOpenCheckbox').checked) {
     drawer.classList.remove('open');
     updateToggleButton();
   }
@@ -252,22 +233,20 @@ document.getElementById('clearMarkersBtn').addEventListener('click', () => {
 
 map.on('dblclick', e => {
   const { lat, lng } = e.latlng;
-  const marker = L.marker([lat, lng]).addTo(map).bindPopup(`Marker: ${lat.toFixed(6)}, ${lng.toFixed(6)}`).openPopup();
+  const marker = L.marker([lat, lng]).addTo(map).bindPopup(`Marker: ${lat.toFixed(5)}, ${lng.toFixed(5)}`).openPopup();
   userMarkers.push(marker);
 });
 
-// Screen wake lock
+// Screen wake lock every 10 seconds
 let wakeLock = null;
 async function requestWakeLock() {
-  try {
-    if('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', ()=>{});
-    }
-  } catch(err){ console.error(err); }
+  try { if('wakeLock' in navigator) {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', ()=>{});
+  }} catch(err){ console.error(err); }
 }
 requestWakeLock();
-setInterval(()=>{if(!wakeLock) requestWakeLock();}, 10000);
+setInterval(()=>{ if(!wakeLock) requestWakeLock(); }, 10000);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && !wakeLock) requestWakeLock(); });
 
 // Fullscreen Control
@@ -293,7 +272,6 @@ L.Control.Fullscreen = L.Control.extend({
 });
 L.control.fullscreen = opts => new L.Control.Fullscreen(opts);
 L.control.fullscreen({ position: 'topleft' }).addTo(map);
-
 document.addEventListener('fullscreenchange', () => {
   const fsBtn = document.querySelector('.fullscreen-btn');
   if (!document.fullscreenElement && fsBtn) fsBtn.innerHTML = '⛶';
