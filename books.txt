@@ -21,5 +21,5 @@ The Curator - Washington Poe Book 3,M. W. Craven,Unread,
 Dead Ground - Washington Poe Book 4,M. W. Craven,Unread,
 Tom Clancy Defense Protocol - Jack Ryan Book 25,Brian Andrews - Jeffrey Wilson,Unread,
 Vultures - John Milton, Mark Dawson,Unread,Orange
-Tom Clancy - Line of Demarcation - Jack	Ryan Jr 13,Unread,
-Tom Clancy - Shadow State - Jack Ryan Jr 12,Unread,
+Tom Clancy - Line of Demarcation - Jack	Ryan Jr 13,Tom Clancy,Unread,
+Tom Clancy - Shadow State - Jack Ryan Jr 12,Tom Clancy,Unread,
