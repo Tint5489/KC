@@ -9,7 +9,7 @@ Pretty Face - Isabella Rose Book 6,Mark Dawson,Unread,
 A Calamity of Souls,David Baldacci,Unread,
 To Die For,David Baldacci,Unread,
 The Company - A Novel of the CIA,Robert Littell,Unread,Orange
-Winter - Penguin Modern Classics,Len Deighton,Unread,Blue
+Winter - Penguin Modern Classics,Len Deighton,Reading,Blue
 Tom Clancy Support and Defend - A Campus Novel,Mark Greaney,Unread,
 A Life in Secrets - Vera Atkins and the Missing Agents of WWII,Sarah Helm,Unread,
 The House in the Woods - Atticus Priest Book 1,Mark Dawson,Unread,Green
