@@ -1,234 +1,322 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lat/Lon → GPX</title>
-<link rel="manifest" href="manifest.json">
-<style>
-body {
-  font-family: system-ui,sans-serif;
-  background:#f8fafc;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:start;
-  min-height:100vh;
-  margin:0;
-  padding:30px;
-}
-.box {
-  background:#fff;
-  border:1px solid #ddd;
-  border-radius:12px;
-  box-shadow:0 4px 10px rgba(0,0,0,0.05);
-  padding:20px 30px;
-  width:420px;
-  text-align:center;
-}
-h2{margin-bottom:15px;}
-input{
-  width:200px;
-  padding:8px;
-  margin:6px;
-  border:1px solid #ccc;
-  border-radius:6px;
-  font-size:15px;
-  text-align:center;
-}
-button{
-  margin:6px;
-  padding:8px 18px;
-  font-size:15px;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-  background:#0078ff;
-  color:white;
-  transition:0.2s;
-}
-button:hover{background:#005fcc;}
-table{
-  margin-top:15px;
-  width:100%;
-  border-collapse:collapse;
-}
-th,td{
-  border-bottom:1px solid #eee;
-  padding:6px 4px;
-  text-align:center;
-}
-th{background:#f3f4f6;}
-td{font-size:14px;}
-.deleteBtn {
-  background:#ef4444;
-  color:white;
-  border:none;
-  border-radius:6px;
-  padding:4px 10px;
-  cursor:pointer;
-  font-size:13px;
-}
-.deleteBtn:hover { background:#dc2626; }
-</style>
+    <meta charset="UTF-8">
+    <title>GPX Point Entry Tool</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; margin-top: 60px; background: #f4f4f4; }
+        h2 { text-align: center; font-size: 20px; }
+        #controls {
+            display: flex;
+            flex-direction: column;
+            max-width: 450px;
+            margin: 0 auto 20px auto;
+            gap: 6px;
+        }
+        input, select, button { padding: 6px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; }
+        button {
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: white;
+        }
+        #addBtn { background-color: #10b981; }
+        #searchBtn { background-color: #3b82f6; }
+        #exportBtn { background-color: #6366f1; }
+        #clearAllBtn { background-color: #ef4444; }
+        #addSelectedBtn { background-color: #f97316; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .table-container {
+            overflow-x: auto;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: auto;
+            min-width: 100%;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: left;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+
+        th {
+            background: #007acc;
+            color: white;
+        }
+
+        th:last-child, td:last-child {
+            min-width: 55px;
+            width: auto;
+        }
+
+        #fileInfo { font-size: 13px; color: #444; text-align: center; }
+        #matchSelect { margin-top: 4px; display: none; width: 100%; font-size: 13px; }
+    </style>
 </head>
 <body>
 
-<div class="box">
-<h2>Lat/Lon → GPX</h2>
+<h2>GPX Point Entry Tool</h2>
 
-<input type="text" id="lat" placeholder="Latitude">
-<input type="text" id="lon" placeholder="Longitude"><br>
+<div id="controls">
+    <input type="file" id="fileInput" accept=".txt,.csv">
+    <div id="fileInfo"></div>
 
-<button id="addBtn">Add Point</button>
-<button id="importBtn">Import GPX</button>
-<button id="exportBtn">Export GPX</button>
-<button id="clearBtn" style="background:#ef4444;">Clear</button>
-<input type="file" id="fileInput" accept=".gpx" style="display:none">
+    <input type="text" id="searchBox" placeholder="Search Name or Postcode">
+    <button id="searchBtn">Search</button>
 
-<hr style="margin:15px 0">
+    <select id="matchSelect" size="4"></select>
+    <button id="addSelectedBtn" style="display:none; margin-top:4px;">Add Selected</button>
 
-<input type="text" id="searchBox" placeholder="Enter postcode (e.g. CA8 1NY)" style="width:250px;"><br>
-<input type="text" id="customerBox" placeholder="Enter customer name (optional)" style="width:250px;"><br>
-<button id="searchBtn" style="background:#10b981;">Search</button>
-<button id="loadFileBtn" style="background:#f59e0b;">Load Search File</button>
-<input type="file" id="searchFileInput" accept=".txt,.csv" style="display:none">
+    <input type="text" id="nameBox" placeholder="Enter Name (optional)">
+    <input type="text" id="latBox" placeholder="Enter Latitude">
+    <input type="text" id="lonBox" placeholder="Enter Longitude">
+    <button id="addBtn">Add Point</button>
+    <button id="exportBtn">Export GPX</button>
+    <button id="clearSearchBtn" style="background-color:#6b7280;">Clear Search</button>
+	<button id="clearAllBtn">Clear All</button>
 
-<table id="pointsTable">
-<thead>
-<tr><th>#</th><th>Name / Index</th><th>Lat</th><th>Lon</th><th>Action</th></tr>
-</thead>
-<tbody></tbody>
-</table>
+    <div id="currentPos" style="font-size:14px; text-align:center; margin-top:6px; color:#333;">
+        Current Position: Getting GPS...
+    </div>
+</div>
+
+<div class="table-container">
+    <table id="pointsTable">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
 </div>
 
 <script>
-let points=[], lastFileContent = localStorage.getItem("lastSearchFileContent") || "";
+    let customerData = [];
 
-// --- Add manually
-document.getElementById("addBtn").addEventListener("click", ()=>{
-  const lat=parseFloat(document.getElementById("lat").value.trim());
-  const lon=parseFloat(document.getElementById("lon").value.trim());
-  const name=document.getElementById("customerBox").value.trim();
-  if(isNaN(lat)||isNaN(lon)) return alert("Please enter valid numbers.");
-  
-  points.push({name:name || (points.length+1).toString(), lat, lon});
-  updateTable();
-
-  clearInputs();
-});
-
-// --- Update table
-function updateTable(){
-  const tbody=document.querySelector("#pointsTable tbody");
-  tbody.innerHTML = points.map((p,i)=>`
-    <tr>
-      <td>${i+1}</td>
-      <td>${p.name}</td>
-      <td>${p.lat.toFixed(6)}</td>
-      <td>${p.lon.toFixed(6)}</td>
-      <td><button class="deleteBtn" onclick="deleteRow(${i})">🗑️</button></td>
-    </tr>
-  `).join("");
-}
-
-// --- Delete row
-function deleteRow(index){
-  points.splice(index,1);
-  updateTable();
-}
-
-// --- Clear inputs
-function clearInputs(){
-  document.getElementById("lat").value="";
-  document.getElementById("lon").value="";
-  document.getElementById("customerBox").value="";
-  document.getElementById("searchBox").value="";
-}
-
-// --- Export GPX
-document.getElementById("exportBtn").addEventListener("click", ()=>{
-  if(points.length===0) return alert("No points to export.");
-  let gpx=`<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="LatLonToGPX" xmlns="http://www.topografix.com/GPX/1/1">\n`;
-  points.forEach((p)=>{gpx+=`  <wpt lat="${p.lat.toFixed(6)}" lon="${p.lon.toFixed(6)}"><name>${p.name}</name></wpt>\n`;});
-  gpx+="</gpx>";
-  const blob=new Blob([gpx],{type:"application/gpx+xml"});
-  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="points.gpx"; a.click(); URL.revokeObjectURL(a.href);
-});
-
-// --- Import GPX
-document.getElementById("importBtn").addEventListener("click", ()=>document.getElementById("fileInput").click());
-document.getElementById("fileInput").addEventListener("change", e=>{
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=event=>{
-    const xml=new DOMParser().parseFromString(event.target.result,"application/xml");
-    const wpts=xml.getElementsByTagName("wpt");
-    points=[];
-    for(let i=0;i<wpts.length;i++){
-      const lat=parseFloat(wpts[i].getAttribute("lat"));
-      const lon=parseFloat(wpts[i].getAttribute("lon"));
-      const name=wpts[i].getElementsByTagName("name")[0]?.textContent || (i+1).toString();
-      if(!isNaN(lat)&&!isNaN(lon)) points.push({name,lat,lon});
+    // NEW — GPS updater (CORRECTED/IMPROVED)
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+            pos => {
+                // SUCCESS: Update the element with the coordinates
+                const lat = pos.coords.latitude.toFixed(6);
+                const lon = pos.coords.longitude.toFixed(6);
+                document.getElementById('currentPos').innerText =
+                    `Current Position: ${lat}, ${lon}`;
+                document.getElementById('currentPos').style.color = '#10b981'; // Success color
+            },
+            err => {
+                // ERROR: Show the specific error message
+                let errorMsg;
+                switch (err.code) {
+                    case err.PERMISSION_DENIED:
+                        errorMsg = "Access Denied. Ensure Android permission is granted.";
+                        break;
+                    case err.POSITION_UNAVAILABLE:
+                        errorMsg = "Location information is unavailable.";
+                        break;
+                    case err.TIMEOUT:
+                        errorMsg = "Timeout. Check GPS signal or try again.";
+                        break;
+                    default:
+                        errorMsg = "An unknown GPS error occurred.";
+                }
+                document.getElementById('currentPos').innerText = `GPS Error: ${errorMsg}`;
+                document.getElementById('currentPos').style.color = '#ef4444'; // Error color
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000, // Increased timeout to 10 seconds
+                maximumAge: 0 // Force a fresh location retrieval
+            }
+        );
+    } else {
+        document.getElementById('currentPos').innerText = "GPS not supported.";
+        document.getElementById('currentPos').style.color = '#333';
     }
-    updateTable(); e.target.value="";
-  };
-  reader.readAsText(file);
-});
+    // END NEW
 
-// --- Clear all
-document.getElementById("clearBtn").addEventListener("click", ()=>{ points=[]; updateTable(); });
+    // Autoload file when selected
+    document.getElementById('fileInput').addEventListener('change', () => {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            customerData = e.target.result.split(/\r?\n/).filter(Boolean);
+            document.getElementById('fileInfo').innerText = `Loaded: ${file.name} (${customerData.length} entries)`;
+        };
+        reader.readAsText(file);
+    });
 
-// --- Load search file manually
-document.getElementById("loadFileBtn").addEventListener("click", ()=>document.getElementById("searchFileInput").click());
-document.getElementById("searchFileInput").addEventListener("change", e=>{
-  const file=e.target.files[0]; if(!file) return;
-  const reader=new FileReader();
-  reader.onload=event=>{
-    lastFileContent = event.target.result;
-    localStorage.setItem("lastSearchFileContent", lastFileContent);
-    e.target.value="";
-    alert("Search file loaded successfully!");
-  };
-  reader.readAsText(file);
-});
+    // Search functionality
+    document.getElementById('searchBtn').addEventListener('click', () => {
+        const search = document.getElementById('searchBox').value.trim().toLowerCase();
+        const matchSelect = document.getElementById('matchSelect');
+        const addSelectedBtn = document.getElementById('addSelectedBtn');
 
-// --- Search and add automatically
-document.getElementById("searchBtn").addEventListener("click", ()=>{
-  const searchTerm=document.getElementById("searchBox").value.trim().toUpperCase();
-  const customerName=document.getElementById("customerBox").value.trim();
-  if(!searchTerm) return alert("Enter postcode to search.");
-  
-  if(lastFileContent){ searchInContent(lastFileContent, searchTerm, customerName); }
-  else{ alert("Please load a search file first."); }
-});
+        matchSelect.innerHTML = '';
+        matchSelect.style.display = 'none';
+        addSelectedBtn.style.display = 'none';
 
-function searchInContent(content, term, customerName){
-  const lines=content.split(/\r?\n/); let found=false;
-  for(let line of lines){
-    if(line.toUpperCase().includes(term)){
-      const parts=line.split(",");
-      if(parts.length>=4){
-        const lat=parseFloat(parts[2]); const lon=parseFloat(parts[3]);
-        if(!isNaN(lat)&&!isNaN(lon)){
-          const name = customerName || (points.length+1).toString();
-          points.push({name, lat, lon});
-          updateTable(); 
-          found=true; break;
+        if (!search) return;
+
+        const matches = customerData.filter(line => line.toLowerCase().includes(search));
+
+        if (matches.length === 0) {
+            alert("No matches found.");
+        } else if (matches.length === 1) {
+            insertLine(matches[0]);
+        } else {
+            matches.forEach(m => {
+                const opt = document.createElement('option');
+                opt.textContent = m;
+                matchSelect.appendChild(opt);
+            });
+            matchSelect.style.display = 'block';
         }
-      }
-    }
-  }
-  if(!found) alert(`"${term}" not found in loaded file.`);
-  clearInputs();
-}
 
-// --- Service Worker
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js')
-  .then(()=>console.log("SW registered"))
-  .catch(err=>console.log("SW fail",err));
-}
+        document.getElementById('searchBox').value = '';
+    });
+
+    // Multi-match selection
+    const matchSelect = document.getElementById('matchSelect');
+    const addSelectedBtn = document.getElementById('addSelectedBtn');
+
+    matchSelect.addEventListener('change', () => {
+        addSelectedBtn.style.display = 'inline-block';
+    });
+
+    addSelectedBtn.addEventListener('click', () => {
+        const value = matchSelect.value;
+        if (value) {
+            insertLine(value);
+            matchSelect.style.display = 'none';
+            addSelectedBtn.style.display = 'none';
+        }
+    });
+
+    // Manual add
+    document.getElementById('addBtn').addEventListener('click', () => {
+        const name = document.getElementById('nameBox').value.trim() || "Unnamed";
+        const lat = document.getElementById('latBox').value.trim();
+        const lon = document.getElementById('lonBox').value.trim();
+        if (!lat || !lon) return alert("Please enter both latitude and longitude.");
+        insertLine(`${name},${lat},${lon}`);
+        document.getElementById('nameBox').value = '';
+        document.getElementById('latBox').value = '';
+        document.getElementById('lonBox').value = '';
+    });
+
+   // Export GPX
+document.getElementById('exportBtn').addEventListener('click', () => {
+    const tbody = document.querySelector('#pointsTable tbody');
+    if (tbody.rows.length === 0) return alert("No points to export.");
+
+    let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+              `<gpx version="1.1" creator="GPX Tool" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+
+    for (let row of tbody.rows) {
+        const name = row.cells[0].textContent;
+        const lat = row.cells[1].textContent;
+        const lon = row.cells[2].textContent;
+
+        gpx +=
+`  <wpt lat="${lat}" lon="${lon}">
+    <name>${name}</name>
+    <sym>Dot</sym>
+    <type>Marks</type>
+    <extensions>
+      <color>0000ff</color>
+    </extensions>
+  </wpt>\n`;
+    }
+
+    gpx += `</gpx>`;
+
+    if (window.Android && window.Android.saveGPX) {
+        window.Android.saveGPX(gpx, "points");
+    } else {
+        const blob = new Blob([gpx], { type: "application/gpx+xml" });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = "points.gpx";
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+});
+
+	// Clear Search ONLY
+	document.getElementById('clearSearchBtn').addEventListener('click', () => {
+    matchSelect.innerHTML = '';
+    matchSelect.style.display = 'none';
+    addSelectedBtn.style.display = 'none';
+	});
+
+
+    // Clear all table rows
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+        document.querySelector('#pointsTable tbody').innerHTML = '';
+		// ALSO CLEAR THE ADDRESS SELECTION BOX (same as Add Selected behaviour)
+    matchSelect.innerHTML = '';
+    matchSelect.style.display = 'none';
+    addSelectedBtn.style.display = 'none';
+
+    });
+
+    // Parse line
+    function parseLine(line) {
+        line = line.replace(/"/g,'').trim();
+        if (!line) return { name: "Unknown", lat: null, lon: null };
+        let parts = line.split(/[\t,]+|\s{2,}/).filter(Boolean);
+        if (parts.length < 3) return { name: line, lat: null, lon: null };
+        let lat = null, lon = null, numericCount = 0;
+        for (let i = parts.length - 1; i >= 0; i--) {
+            if (!isNaN(parts[i])) {
+                if (lon === null) lon = parts[i];
+                else if (lat === null) lat = parts[i];
+                numericCount++;
+                if (numericCount >= 2) break;
+            }
+        }
+        const latIndex = parts.lastIndexOf(lat);
+        const nameParts = parts.slice(0, latIndex);
+        const name = nameParts.join(' ').trim();
+        return { name: name || "Unknown", lat, lon };
+    }
+
+    // Insert line into table
+    function insertLine(line) {
+        const { name, lat, lon } = parseLine(line);
+        if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
+            alert("Invalid coordinates found in line:\n" + line);
+            return;
+        }
+        const tbody = document.querySelector('#pointsTable tbody');
+        const row = tbody.insertRow();
+        row.insertCell(0).textContent = name;
+        row.insertCell(1).textContent = lat;
+        row.insertCell(2).textContent = lon;
+        const delCell = row.insertCell(3);
+        const btn = document.createElement('button');
+        btn.textContent = '🗑️';
+        btn.onclick = () => row.remove();
+        delCell.appendChild(btn);
+    }
 </script>
+
 </body>
 </html>
