@@ -1,99 +1,136 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Live Lat, Lon & Speed (mph)</title>
+<meta charset="UTF-8">
+<title>GPS Where Am I</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #111;
-    color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-  }
-  .frame {
-    border: 2px solid #444;
-    border-radius: 10px;
-    padding: 30px 50px;
-    background: #1a1a1a;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    text-align: center;
-  }
-  h1 { font-size: 22px; margin-bottom: 20px; }
-  .data { font-size: 24px; margin: 10px 0; }
+    body {
+        margin: 0;
+        padding: 0;
+        background: black;
+        color: white;
+        font-family: Arial, sans-serif;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        transition: background-color 0.3s ease;
+    }
+
+    .container {
+        width: 95vw;
+        max-width: 900px;
+    }
+
+    .wakeBtn, .freezeBtn {
+        padding: 12px 20px;
+        font-size: 20px;
+        margin-bottom: 15px;
+        border: none;
+        border-radius: 10px;
+        font-weight: bold;
+    }
+
+    .wakeBtn {
+        background: #33aaff;
+        color: black;
+    }
+
+    .freezeBtn {
+        background: #ffcc00;
+        color: black;
+    }
+
+    .title {
+        font-size: 6vw;
+        font-weight: bold;
+        margin-bottom: 3vw;
+    }
+
+    .data { font-size: 5vw; margin: 2vw 0; }
+
+    @media (min-width: 900px){
+        .title{font-size:50px;}
+        .data{font-size:40px;}
+    }
+
+    @media (orientation: landscape) and (max-height:500px){
+        .title{font-size:4vw;}
+        .data{font-size:3.3vw;}
+    }
+
+    .data span { display:inline-block; min-width:120px; }
 </style>
 </head>
+
 <body>
-  <div class="frame">
-    <h1>Current Position & Speed (mph)</h1>
-    <div class="data">Lat: <span id="lat">—</span></div>
-    <div class="data">Lon: <span id="lon">—</span></div>
-    <div class="data">Speed: <span id="speed">—</span></div>
-    <div class="data" id="wakeStatus" style="font-size:14px;color:#aaa;margin-top:15px;">Keeping screen awake…</div>
-  </div>
+<div class="container">
+
+    <button id="wakeBtn" class="wakeBtn">Keep Screen Awake</button>
+    <button id="freezeBtn" class="freezeBtn">Freeze Position</button>
+
+    <div class="title">GPS Where Am I</div>
+
+    <div class="data">Lat: <span id="lat">--</span></div>
+    <div class="data">Lon: <span id="lon">--</span></div>
+    <div class="data">Accuracy: <span id="acc">--</span> m</div>
+
+</div>
 
 <script>
-let watchId = null;
-const latEl = document.getElementById('lat');
-const lonEl = document.getElementById('lon');
-const speedEl = document.getElementById('speed');
-const wakeStatus = document.getElementById('wakeStatus');
-const MPS_TO_MPH = 2.23694;
+// ---------- Screen Wake Lock ----------
+const wakeBtn = document.getElementById("wakeBtn");
 let wakeLock = null;
 
-function start() {
-  if (!navigator.geolocation) {
-    alert('Geolocation not supported');
-    return;
-  }
-  if (watchId) return;
+async function enableWakeLock() {
+    try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", enableWakeLock);
+        wakeBtn.style.display = "none";
+    } catch (e) {
+        console.log("WakeLock Error:", e);
+    }
+}
 
-  watchId = navigator.geolocation.watchPosition(pos => {
+wakeBtn.addEventListener("click", enableWakeLock);
+
+// ---------- GPS ----------
+const latEl = document.getElementById("lat");
+const lonEl = document.getElementById("lon");
+const accEl = document.getElementById("acc");
+const freezeBtn = document.getElementById("freezeBtn");
+
+let frozen = false;
+
+freezeBtn.addEventListener("click", () => {
+    frozen = !frozen;
+    freezeBtn.textContent = frozen ? "Live Position" : "Freeze Position";
+});
+
+if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(updateUI, gpsError, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 5000
+    });
+}
+
+function gpsError(e){
+    console.log("GPS Error:", e);
+}
+
+function updateUI(pos) {
+    if (frozen) return;   // 🔒 HOLD CURRENT POSITION
+
     const c = pos.coords;
     latEl.textContent = c.latitude.toFixed(6);
     lonEl.textContent = c.longitude.toFixed(6);
-    if (c.speed !== null) {
-      speedEl.textContent = (c.speed * MPS_TO_MPH).toFixed(2);
-    } else {
-      speedEl.textContent = 'N/A';
-    }
-  }, err => alert(err.message), { enableHighAccuracy: true });
+    accEl.textContent = c.accuracy !== null ? c.accuracy.toFixed(1) : "--";
 }
-
-async function keepAwake() {
-  // Try Screen Wake Lock API first
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeStatus.textContent = 'Screen awake (Wake Lock API)';
-      wakeLock.addEventListener('release', () => {
-        wakeStatus.textContent = 'Wake Lock released';
-      });
-    } else {
-      throw new Error('Wake Lock not supported');
-    }
-  } catch (err) {
-    // Fallback to silent video trick
-    wakeStatus.textContent = 'Using fallback keep-awake';
-    const video = document.createElement('video');
-    video.setAttribute('muted', '');
-    video.setAttribute('playsinline', '');
-    video.loop = true;
-    video.src = 'data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDFtcDQyaXNvbQAAABRnZGF0YQAAAAE=';
-    document.body.appendChild(video);
-    video.play().catch(()=>{});
-  }
-}
-
-window.onload = () => {
-  start();
-  keepAwake();
-};
 </script>
+
 </body>
 </html>
