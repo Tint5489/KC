@@ -84,7 +84,7 @@
     <button id="addBtn">Add Point</button>
     <button id="exportBtn">Export GPX</button>
     <button id="clearSearchBtn" style="background-color:#6b7280;">Clear Search</button>
-	<button id="clearAllBtn">Clear All</button>
+    <button id="clearAllBtn">Clear All</button>
 
     <div id="currentPos" style="font-size:14px; text-align:center; margin-top:6px; color:#333;">
         Current Position: Getting GPS...
@@ -108,19 +108,28 @@
 <script>
     let customerData = [];
 
-    // NEW — GPS updater (CORRECTED/IMPROVED)
+    // DATE + TIME FOR GPX FILENAME (ADDED)
+    function getTodayDMY_Time() {
+        const d = new Date();
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day}-${month}-${year}_${hours}-${minutes}`;
+    }
+
+    // GPS updater
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition(
             pos => {
-                // SUCCESS: Update the element with the coordinates
                 const lat = pos.coords.latitude.toFixed(6);
                 const lon = pos.coords.longitude.toFixed(6);
                 document.getElementById('currentPos').innerText =
                     `Current Position: ${lat}, ${lon}`;
-                document.getElementById('currentPos').style.color = '#10b981'; // Success color
+                document.getElementById('currentPos').style.color = '#10b981';
             },
             err => {
-                // ERROR: Show the specific error message
                 let errorMsg;
                 switch (err.code) {
                     case err.PERMISSION_DENIED:
@@ -136,51 +145,43 @@
                         errorMsg = "An unknown GPS error occurred.";
                 }
                 document.getElementById('currentPos').innerText = `GPS Error: ${errorMsg}`;
-                document.getElementById('currentPos').style.color = '#ef4444'; // Error color
+                document.getElementById('currentPos').style.color = '#ef4444';
             },
             {
                 enableHighAccuracy: true,
-                timeout: 10000, // Increased timeout to 10 seconds
-                maximumAge: 0 // Force a fresh location retrieval
+                timeout: 10000,
+                maximumAge: 0
             }
         );
     } else {
         document.getElementById('currentPos').innerText = "GPS not supported.";
-        document.getElementById('currentPos').style.color = '#333';
     }
-    // END NEW
 
-    // Autoload file when selected
+    // Autoload file
     document.getElementById('fileInput').addEventListener('change', () => {
         const file = document.getElementById('fileInput').files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = e => {
             customerData = e.target.result.split(/\r?\n/).filter(Boolean);
-            document.getElementById('fileInfo').innerText = `Loaded: ${file.name} (${customerData.length} entries)`;
+            document.getElementById('fileInfo').innerText =
+                `Loaded: ${file.name} (${customerData.length} entries)`;
         };
         reader.readAsText(file);
     });
 
-    // Search functionality
+    // Search
     document.getElementById('searchBtn').addEventListener('click', () => {
         const search = document.getElementById('searchBox').value.trim().toLowerCase();
-        const matchSelect = document.getElementById('matchSelect');
-        const addSelectedBtn = document.getElementById('addSelectedBtn');
-
         matchSelect.innerHTML = '';
         matchSelect.style.display = 'none';
         addSelectedBtn.style.display = 'none';
-
         if (!search) return;
 
         const matches = customerData.filter(line => line.toLowerCase().includes(search));
-
-        if (matches.length === 0) {
-            alert("No matches found.");
-        } else if (matches.length === 1) {
-            insertLine(matches[0]);
-        } else {
+        if (matches.length === 0) alert("No matches found.");
+        else if (matches.length === 1) insertLine(matches[0]);
+        else {
             matches.forEach(m => {
                 const opt = document.createElement('option');
                 opt.textContent = m;
@@ -188,11 +189,9 @@
             });
             matchSelect.style.display = 'block';
         }
-
         document.getElementById('searchBox').value = '';
     });
 
-    // Multi-match selection
     const matchSelect = document.getElementById('matchSelect');
     const addSelectedBtn = document.getElementById('addSelectedBtn');
 
@@ -201,9 +200,8 @@
     });
 
     addSelectedBtn.addEventListener('click', () => {
-        const value = matchSelect.value;
-        if (value) {
-            insertLine(value);
+        if (matchSelect.value) {
+            insertLine(matchSelect.value);
             matchSelect.style.display = 'none';
             addSelectedBtn.style.display = 'none';
         }
@@ -221,100 +219,81 @@
         document.getElementById('lonBox').value = '';
     });
 
-   // Export GPX
-document.getElementById('exportBtn').addEventListener('click', () => {
-    const tbody = document.querySelector('#pointsTable tbody');
-    if (tbody.rows.length === 0) return alert("No points to export.");
+    // Export GPX (UPDATED FILENAME)
+    document.getElementById('exportBtn').addEventListener('click', () => {
+        const tbody = document.querySelector('#pointsTable tbody');
+        if (tbody.rows.length === 0) return alert("No points to export.");
 
-    let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n` +
-              `<gpx version="1.1" creator="GPX Tool" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+        let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+                  `<gpx version="1.1" creator="GPX Tool" xmlns="http://www.topografix.com/GPX/1/1">\n`;
 
-    for (let row of tbody.rows) {
-        const name = row.cells[0].textContent;
-        const lat = row.cells[1].textContent;
-        const lon = row.cells[2].textContent;
-
-        gpx +=
-`  <wpt lat="${lat}" lon="${lon}">
-    <name>${name}</name>
+        for (let row of tbody.rows) {
+            gpx +=
+`  <wpt lat="${row.cells[1].textContent}" lon="${row.cells[2].textContent}">
+    <name>${row.cells[0].textContent}</name>
     <sym>Dot</sym>
     <type>Marks</type>
     <extensions>
       <color>0000ff</color>
     </extensions>
   </wpt>\n`;
-    }
+        }
 
-    gpx += `</gpx>`;
+        gpx += `</gpx>`;
 
-    if (window.Android && window.Android.saveGPX) {
-        window.Android.saveGPX(gpx, "points");
-    } else {
-        const blob = new Blob([gpx], { type: "application/gpx+xml" });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = "points.gpx";
-        a.click();
-        URL.revokeObjectURL(a.href);
-    }
-});
+        const fileName = `Points-${getTodayDMY_Time()}.gpx`;
 
-	// Clear Search ONLY
-	document.getElementById('clearSearchBtn').addEventListener('click', () => {
-    matchSelect.innerHTML = '';
-    matchSelect.style.display = 'none';
-    addSelectedBtn.style.display = 'none';
-	});
-
-
-    // Clear all table rows
-    document.getElementById('clearAllBtn').addEventListener('click', () => {
-        document.querySelector('#pointsTable tbody').innerHTML = '';
-		// ALSO CLEAR THE ADDRESS SELECTION BOX (same as Add Selected behaviour)
-    matchSelect.innerHTML = '';
-    matchSelect.style.display = 'none';
-    addSelectedBtn.style.display = 'none';
-
+        if (window.Android && window.Android.saveGPX) {
+            window.Android.saveGPX(gpx, fileName);
+        } else {
+            const blob = new Blob([gpx], { type: "application/gpx+xml" });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
     });
 
-    // Parse line
+    // Clear Search
+    document.getElementById('clearSearchBtn').addEventListener('click', () => {
+        matchSelect.innerHTML = '';
+        matchSelect.style.display = 'none';
+        addSelectedBtn.style.display = 'none';
+    });
+
+    // Clear All
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+        document.querySelector('#pointsTable tbody').innerHTML = '';
+        matchSelect.innerHTML = '';
+        matchSelect.style.display = 'none';
+        addSelectedBtn.style.display = 'none';
+    });
+
     function parseLine(line) {
         line = line.replace(/"/g,'').trim();
-        if (!line) return { name: "Unknown", lat: null, lon: null };
         let parts = line.split(/[\t,]+|\s{2,}/).filter(Boolean);
         if (parts.length < 3) return { name: line, lat: null, lon: null };
-        let lat = null, lon = null, numericCount = 0;
-        for (let i = parts.length - 1; i >= 0; i--) {
-            if (!isNaN(parts[i])) {
-                if (lon === null) lon = parts[i];
-                else if (lat === null) lat = parts[i];
-                numericCount++;
-                if (numericCount >= 2) break;
-            }
-        }
-        const latIndex = parts.lastIndexOf(lat);
-        const nameParts = parts.slice(0, latIndex);
-        const name = nameParts.join(' ').trim();
+        let lat = parts[parts.length - 2];
+        let lon = parts[parts.length - 1];
+        let name = parts.slice(0, -2).join(' ');
         return { name: name || "Unknown", lat, lon };
     }
 
-    // Insert line into table
     function insertLine(line) {
         const { name, lat, lon } = parseLine(line);
         if (!lat || !lon || isNaN(lat) || isNaN(lon)) {
-            alert("Invalid coordinates found in line:\n" + line);
+            alert("Invalid coordinates:\n" + line);
             return;
         }
-        const tbody = document.querySelector('#pointsTable tbody');
-        const row = tbody.insertRow();
+        const row = document.querySelector('#pointsTable tbody').insertRow();
         row.insertCell(0).textContent = name;
         row.insertCell(1).textContent = lat;
         row.insertCell(2).textContent = lon;
-        const delCell = row.insertCell(3);
-        const btn = document.createElement('button');
-        btn.textContent = '🗑️';
-        btn.onclick = () => row.remove();
-        delCell.appendChild(btn);
+        const del = document.createElement('button');
+        del.textContent = '🗑️';
+        del.onclick = () => row.remove();
+        row.insertCell(3).appendChild(del);
     }
 </script>
 
