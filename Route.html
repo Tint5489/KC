@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Route Planner with GPX & Mapbox API</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="icon" href="gps-navigation.png" type="image/png">
 <style>
 html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sans-serif; }
 #map { position:absolute; top:0; left:0; right:0; bottom:0; }
@@ -58,6 +59,46 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
 .marker-label { color:#fff; border-radius:50%; width:24px; height:24px;
   line-height:24px; text-align:center; font-weight:bold;
   border:2px solid white; box-shadow:0 0 2px rgba(0,0,0,0.5);}
+
+.location-dot {
+  width: 10px;
+  height: 10px;
+  background: red;
+  border-radius: 50%;
+}
+
+.location-dot.flash {
+  animation: flash 0.8s ease-out 2;
+}
+
+@keyframes flash {
+  0%   { opacity: 1; transform: scale(1); }
+  50%  { opacity: 0.3; transform: scale(1.6); }
+  100% { opacity: 1; transform: scale(1); }
+}
+/* Toggle Switch Styling */
+.routing-switch-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 8px;
+  background: #eee;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.switch { position: relative; display: inline-block; width: 34px; height: 20px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc; transition: .4s; border-radius: 20px;
+}
+.slider:before {
+  position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+  background-color: white; transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: #3b82f6; }
+input:checked + .slider:before { transform: translateX(14px); }
 </style>
 </head>
 <body>
@@ -65,16 +106,40 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
 
 <aside id="sidebar">
   <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+  <div class="routing-switch-container">
+  <strong>Map Mode:</strong>
+  <label class="switch">
+    <input type="checkbox" id="routingToggle" onchange="calculateRoute()">
+    <span class="slider"></span>
+  </label>
+  <span id="routingStatusLabel">Routing ON</span>
+</div>
     <button onclick="clearStops()">Clear (keep Start/End)</button>
     <button onclick="exportGPX()">Export GPX</button>
     <button onclick="deleteSelectedStops()">Delete Selected</button>
     
-    <label for="importFile" style="background:#007bff;color:#fff;padding:4px 8px;border-radius:4px;cursor:pointer;">Choose GPX file(s)</label>
-    <input type="file" id="importFile" accept=".gpx" multiple style="display:none;" onchange="importGPX(event)">
-    <span id="fileLabel" style="font-size:12px; color:#555;"></span>
+    <button type="button" onclick="document.getElementById('universalImport').click()" style="background:#10b981; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">
+      Import GPX / TXT / CSV
+    </button>
+    <input type="file" id="universalImport" multiple accept=".gpx,.txt,.csv" style="display:none;" onchange="handleUniversalImport(event)">
+    <span id="fileLabel" style="font-size:11px; color:#555; width:100%;"></span>
   </div>
 
   <button id="toggleLocation" style="margin-bottom:10px;">Enable Current Location</button>
+
+  <hr>
+  <div id="customerFileInfo" style="font-size:12px;color:#555; margin-bottom:4px;">Search within imported text data:</div>
+  <input type="text" id="customerSearchBox" placeholder="Search Name or Postcode"
+         style="width:100%;max-width:320px;box-sizing:border-box;margin-top:4px;padding:4px;">
+  <button id="customerSearchBtn" style="background:#3b82f6;color:white;padding:4px 8px;border:none;border-radius:4px;cursor:pointer;margin-top:4px;">Search</button>
+  <select id="customerMatchSelect" size="4" style="display:none; width:100%; margin-top:4px;"></select>
+  <button id="customerAddSelectedBtn" style="display:none; background:#f97316;color:white;padding:4px 8px;border:none;border-radius:4px;cursor:pointer;margin-top:4px;">Add Selected</button>
+
+<hr>
+<input type="text" id="manualName" placeholder="Customer name / address" style="width:90%;padding:4px;margin-top:4px;">
+<input type="text" id="manualLat" placeholder="Latitude" style="width:42%;padding:2px;margin-top:4px;">
+<input type="text" id="manualLon" placeholder="Longitude" style="width:42%;padding:2px;margin-top:4px;">
+<button onclick="addManualStop()" style="margin-top:4px;width:90%;">Add to Route</button>
 
   <div id="tableContainer">
     <table id="stopsTable">
@@ -86,38 +151,86 @@ html, body { margin:0; height:100%; width:100vw; overflow:hidden; font-family:sa
   <div id="routeInfo" style="margin-top:10px;"></div>
 </aside>
 
-<div id="sidebarToggle">&#x25C0;</div> <!-- always-visible toggle button -->
+<div id="sidebarToggle">&#x25C0;</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+
 <script>
+// Logic Constants
 const WORK_START = { name:"Start", lat:54.971630, lon:-2.949631 };
 const WORK_STOP  = { name:"End", lat:54.971653, lon:-2.949319 };
 const DEFAULT_CENTER = [54.58303,-2.56954];
 const DEFAULT_ZOOM = 6;
-const MAPBOX_TOKEN = 'pk.eyJ1Ijoibmlja2llc2hpbGwiLCJhIjoiY21meTl6cGszMGpqZDJrc2htOXQ3d2s0OSJ9.Yg8NuZbRwGovAt4AWHWxMQ';
+const MAPBOX_TOKEN = 'pk.eyJ1Ijoibmlja2llc2hpbGwiLCJhIjoiY21md25iNmxpMDB5ZTJrczEzc3llYjk4MyJ9.96sMwmcMcI30V0LqtsVIGQ';
 
 const map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ maxZoom:19 }).addTo(map);
 
 let stops = [WORK_START, WORK_STOP];
+let customerData = []; 
 let markers = [];
 let routeLine = null;
 const stopsBody = document.getElementById("stopsBody");
 const routeInfoEl = document.getElementById("routeInfo");
 let sortable = null;
 
-// Table & markers
+// ===================== UNIVERSAL IMPORT LOGIC =====================
+function handleUniversalImport(event) {
+  const files = event.target.files;
+  const fileLabel = document.getElementById("fileLabel");
+  if(!files.length) return;
+
+  fileLabel.textContent = Array.from(files).map(f=>f.name).join(', ');
+
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    const extension = file.name.split('.').pop().toLowerCase();
+
+    reader.onload = e => {
+      const content = e.target.result;
+      if (extension === 'gpx') {
+        importGPXLogic(content);
+      } else if (extension === 'txt' || extension === 'csv') {
+        importTextLogic(content, file.name);
+      }
+    };
+    reader.readAsText(file);
+  });
+  event.target.value = ""; // Reset
+}
+
+function importGPXLogic(content) {
+  try {
+    const xml = new DOMParser().parseFromString(content, "text/xml");
+    const wpts = xml.getElementsByTagName("wpt");
+    const newStops = [];
+    for(let i=0; i<wpts.length; i++){
+      const lat = parseFloat(wpts[i].getAttribute("lat"));
+      const lon = parseFloat(wpts[i].getAttribute("lon"));
+      const nameEl = wpts[i].getElementsByTagName("name")[0];
+      const name = nameEl ? nameEl.textContent : "Waypoint";
+      newStops.push({lat, lon, name});
+    }
+    stops = [stops[0], ...stops.slice(1,-1), ...newStops, stops[stops.length-1]];
+    updateStopsTable();
+    setTimeout(calculateRoute, 200);
+  } catch(err){ alert("GPX Error: " + err.message); }
+}
+
+function importTextLogic(content, fileName) {
+  customerData = content.split(/\r?\n/).filter(Boolean);
+  document.getElementById("customerFileInfo").textContent = `Loaded: ${fileName} (${customerData.length} lines)`;
+}
+
+// ===================== REST OF FUNCTIONS =====================
+
 function updateStopsTable(){
   stopsBody.innerHTML = stops.map((s,i)=>{
     const locked = (i===0 || i===stops.length-1);
-    return `<tr data-index="${i}">
-      <td class="drag-handle" ${locked ? '' : `title="Drag stop #${i+1}"`}>${i+1}</td>
-      <td>${s.name}${locked?" (fixed)":""}</td>
-      <td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td>
-    </tr>`;
+    return `<tr data-index="${i}"><td class="drag-handle" ${locked ? '' : `title="Drag stop #${i+1}"`}>${i+1}</td><td>${s.name}${locked?" (fixed)":""}</td><td>${locked?"":'<input type="checkbox" class="deleteChk"/>'}</td></tr>`;
   }).join("");
-  stopsBody.innerHTML += `<tr><td colspan="3" style="text-align:center;color:#888;">(empty)</td></tr>`;
+  if(stops.length<=2) stopsBody.innerHTML += `<tr><td colspan="3" style="text-align:center;color:#888;">(empty)</td></tr>`;
   refreshMarkers();
   initSortable();
 }
@@ -135,7 +248,6 @@ function refreshMarkers(){
   });
 }
 
-// Draggable table
 function initSortable(){
   if(sortable){ try{sortable.destroy();}catch(e){} }
   sortable = Sortable.create(stopsBody, {
@@ -154,10 +266,8 @@ function initSortable(){
   });
 }
 
-// Clear stops
 function clearStops(){ stops=[WORK_START,WORK_STOP]; if(routeLine){ map.removeLayer(routeLine); routeLine=null;} updateStopsTable(); routeInfoEl.textContent=""; }
 
-// Delete selected
 function deleteSelectedStops(){
   const checkboxes=stopsBody.querySelectorAll(".deleteChk:checked");
   if(!checkboxes.length) return;
@@ -166,7 +276,6 @@ function deleteSelectedStops(){
   updateStopsTable(); calculateRoute();
 }
 
-// Export GPX (only non-start/end)
 function exportGPX(){
   if(stops.length<=2) return alert("No stops to export");
   let gpx='<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="LeafletRouteApp" xmlns="http://www.topografix.com/GPX/1/1">\n';
@@ -176,65 +285,46 @@ function exportGPX(){
   const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="stops.gpx"; a.click(); URL.revokeObjectURL(url);
 }
 
-// GPX import
-function importGPX(event){
-  const files = event.target.files;
-  const fileLabel = document.getElementById("fileLabel");
-  fileLabel.textContent = files.length ? Array.from(files).map(f=>f.name).join(', ') : '';
-  if(!files || files.length===0) return;
+async function calculateRoute() {
+  // 1. Clear existing route line and info regardless of mode
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  routeInfoEl.textContent = "";
 
-  Array.from(files).forEach(file=>{
-    const reader = new FileReader();
-    reader.onload = e=>{
-      try {
-        const xml = new DOMParser().parseFromString(e.target.result,"text/xml");
-        const wpts = xml.getElementsByTagName("wpt");
-        const newStops = [];
-        for(let i=0;i<wpts.length;i++){
-          const wpt = wpts[i];
-          const lat=parseFloat(wpt.getAttribute("lat"));
-          const lon=parseFloat(wpt.getAttribute("lon"));
-          const nameEl = wpt.getElementsByTagName("name")[0];
-          const name = nameEl ? nameEl.textContent : "Waypoint";
-          newStops.push({lat, lon, name});
-        }
+  const isRoutingOn = document.getElementById("routingToggle").checked;
+  const statusLabel = document.getElementById("routingStatusLabel");
 
-        stops = [stops[0], ...stops.slice(1,-1), ...newStops, stops[stops.length-1]];
-      } catch(err){ alert("Failed to import GPX: "+err.message); }
-      updateStopsTable();
-      setTimeout(calculateRoute, 200);
-    };
-    reader.readAsText(file);
-  });
-  event.target.value="";
-}
+  // Update label text
+  statusLabel.textContent = isRoutingOn ? "Routing ON" : "Points Only";
 
-// Mapbox routing
-async function calculateRoute(){
-  if(routeLine){ map.removeLayer(routeLine); routeLine=null;}
-  if(stops.length<2) return;
+  // 2. If Routing is OFF, stop here (markers are already updated by refreshMarkers via updateStopsTable)
+  if (!isRoutingOn) return;
 
-  const coords = stops.map(s=>`${s.lon},${s.lat}`).join(';');
+  // 3. Logic for Routing ON
+  if (stops.length < 2) return;
+  const coords = stops.map(s => `${s.lon},${s.lat}`).join(';');
   const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
-
-  try{
+  
+  try {
     const resp = await fetch(url);
     const data = await resp.json();
-    if(!data.routes || !data.routes[0]) return;
-
+    if (!data.routes || !data.routes[0]) return;
+    
     const geo = data.routes[0].geometry;
-    routeLine = L.geoJSON(geo, {color:'#00008B', weight:4, opacity:1}).addTo(map);
-
-    const distKm=(data.routes[0].distance/1000).toFixed(1);
-    const distMi=(data.routes[0].distance/1609.34).toFixed(1);
+    routeLine = L.geoJSON(geo, { color: '#00008B', weight: 4, opacity: 1 }).addTo(map);
+    
+    const distMi = (data.routes[0].distance / 1609.34).toFixed(1);
     const totalSec = data.routes[0].duration;
-    const hours=Math.floor(totalSec/3600);
-    const mins=Math.round((totalSec%3600)/60);
-    routeInfoEl.textContent=`Total distance: ${distKm} km (${distMi} mi), Estimated time: ${hours}h ${mins}m`;
-  }catch(err){ console.error(err); }
+    const hours = Math.floor(totalSec / 3600);
+    const mins = Math.round((totalSec % 3600) / 60);
+    
+    routeInfoEl.textContent = `Total distance: ${distMi} mi, Est. time: ${hours}h ${mins}m`;
+  } catch (err) { 
+    console.error("Routing Error:", err); 
+    routeInfoEl.textContent = "Error calculating route.";
+  }
 }
 
-// Sidebar toggle
+// Sidebar Toggle
 document.getElementById("sidebarToggle").addEventListener("click", ()=>{
   const sidebar = document.getElementById("sidebar");
   sidebar.classList.toggle("collapsed");
@@ -243,39 +333,96 @@ document.getElementById("sidebarToggle").addEventListener("click", ()=>{
   setTimeout(()=>map.invalidateSize(), 300);
 });
 
-// Current location
-let locationMarker=null;
-let locationWatchId=null;
-document.getElementById("toggleLocation").addEventListener("click",()=>{
-  const btn=document.getElementById("toggleLocation");
-  if(locationWatchId){
-    navigator.geolocation.clearWatch(locationWatchId);
-    locationWatchId=null;
-    if(locationMarker){ map.removeLayer(locationMarker); locationMarker=null;}
-    btn.textContent="Enable Current Location";
+// Location Tracker
+let locationMarker = null, watchId = null, lastLat = null, lastLon = null;
+document.getElementById("toggleLocation").addEventListener("click", () => {
+  const btn = document.getElementById("toggleLocation");
+  if (watchId) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    if (locationMarker) map.removeLayer(locationMarker);
+    btn.textContent = "Enable Current Location";
   } else {
-    locationWatchId=navigator.geolocation.watchPosition(pos=>{
-      const lat=pos.coords.latitude, lon=pos.coords.longitude;
-      if(locationMarker) locationMarker.setLatLng([lat,lon]);
-      else{
-        const icon=L.divIcon({className:'', html:`<div style="width:20px;height:20px;background:red;border-radius:50%"></div>`, iconSize:[20,20], iconAnchor:[10,10]});
-        locationMarker=L.marker([lat,lon],{icon}).addTo(map);
+    watchId = navigator.geolocation.watchPosition(pos => {
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      const moved = lastLat !== lat || lastLon !== lon;
+      lastLat = lat; lastLon = lon;
+      const dotHtml = `<div class="location-dot${moved ? ' flash' : ''}"></div>`;
+      if (locationMarker) {
+        locationMarker.setLatLng([lat, lon]).setIcon(L.divIcon({className:'', html:dotHtml, iconSize:[10,10], iconAnchor:[5,5]}));
+      } else {
+        locationMarker = L.marker([lat, lon], {icon: L.divIcon({className:'', html:dotHtml, iconSize:[10,10], iconAnchor:[5,5]})}).addTo(map);
+        map.setView([lat, lon], 15);
       }
-    }, err=>console.warn(err), {enableHighAccuracy:true});
-    btn.textContent="Disable Current Location";
+    }, err => console.warn(err), { enableHighAccuracy: true });
+    btn.textContent = "Disable Current Location";
   }
 });
 
-// Double-click add stop
+// Search Logic
+const customerSearchBox = document.getElementById("customerSearchBox");
+const customerSearchBtn = document.getElementById("customerSearchBtn");
+const customerMatchSelect = document.getElementById("customerMatchSelect");
+const customerAddSelectedBtn = document.getElementById("customerAddSelectedBtn");
+
+customerSearchBox.addEventListener("keydown", e => { if (e.key === "Enter") customerSearchBtn.click(); });
+
+customerSearchBtn.addEventListener("click", () => {
+  const search = customerSearchBox.value.trim().toLowerCase();
+  customerMatchSelect.innerHTML = "";
+  customerMatchSelect.style.display = "none";
+  customerAddSelectedBtn.style.display = "none";
+  if (!search) return;
+  const matches = customerData.filter(line => line.toLowerCase().includes(search));
+  if (!matches.length) alert("No matches found.");
+  else if (matches.length === 1) insertCustomerLine(matches[0]);
+  else {
+    matches.forEach(m => {
+      const opt = document.createElement("option");
+      opt.textContent = m;
+      customerMatchSelect.appendChild(opt);
+    });
+    customerMatchSelect.style.display = "block";
+  }
+});
+
+customerMatchSelect.addEventListener("change", () => { customerAddSelectedBtn.style.display = "inline-block"; });
+customerAddSelectedBtn.addEventListener("click", () => {
+  if (customerMatchSelect.value) {
+    insertCustomerLine(customerMatchSelect.value);
+    customerMatchSelect.style.display = "none";
+    customerAddSelectedBtn.style.display = "none";
+  }
+});
+
+function insertCustomerLine(line){
+  line = line.replace(/"/g,'').trim();
+  let parts = line.split(/[\t,]+|\s{2,}/).filter(Boolean);
+  if(parts.length < 3) return alert("Line must include name, lat, lon");
+  let lat = parseFloat(parts[parts.length-2]), lon = parseFloat(parts[parts.length-1]);
+  let name = parts.slice(0, -2).join(' ') || "Unnamed";
+  stops.splice(stops.length-1,0,{name,lat,lon});
+  updateStopsTable(); calculateRoute();
+}
+
+function addManualStop(){
+  const name = document.getElementById("manualName").value.trim();
+  const lat = parseFloat(document.getElementById("manualLat").value), lon = parseFloat(document.getElementById("manualLon").value);
+  if (!name || isNaN(lat) || isNaN(lon)) return alert("Please enter name, lat and lon");
+  stops.splice(stops.length - 1, 0, { name, lat, lon });
+  updateStopsTable(); calculateRoute();
+  document.getElementById("manualName").value = "";
+  document.getElementById("manualLat").value = "";
+  document.getElementById("manualLon").value = "";
+}
+
 map.on("dblclick", e=>{
   const lat=e.latlng.lat, lon=e.latlng.lng;
   const name="Stop "+(stops.length-1);
   stops.splice(stops.length-1,0,{lat,lon,name});
-  updateStopsTable();
-  calculateRoute();
+  updateStopsTable(); calculateRoute();
 });
 
-// Init
 updateStopsTable();
 calculateRoute();
 </script>
